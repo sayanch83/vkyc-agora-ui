@@ -56,7 +56,7 @@ export class VkycAgent {
   private _lastRemoteUid: any = null;
   @State() remoteUid: number|null = null;
   @State() pendingApplicant: {name:string;caseId:string}|null = null;
-  @State() applicantDevice: {deviceType:string;os:string;browser:string;screen:string}|null = null;
+  @State() applicantDeviceStr = '';
   @State() applicantIsMobile = false;
 
   async componentDidLoad() {
@@ -87,8 +87,10 @@ export class VkycAgent {
           this.activeCase = matched;
           this.cases = this.cases.map(x => x.id===matched.id ? {...x, status:'in-progress'} : x);
           if (data.device) {
-            this.applicantDevice = data.device;
-            this.applicantIsMobile = data.device.deviceType === 'Mobile' || data.device.deviceType === 'Tablet';
+            const d = data.device;
+            const icon = d.deviceType === 'Mobile' ? '📱' : d.deviceType === 'Tablet' ? '📟' : '💻';
+            this.applicantDeviceStr = icon + ' ' + d.os + ' · ' + d.browser + ' · ' + d.screen;
+            this.applicantIsMobile = d.deviceType === 'Mobile' || d.deviceType === 'Tablet';
           }
           this.showAdmitModal = true;
         }
@@ -432,10 +434,9 @@ export class VkycAgent {
                 : <span class="sb-tag sb-tag--amber">eKYC Valid</span>}
             </div>
             <div class="sb-assigned">Officer: Agent Kumar · AGT001</div>
-            {this.applicantDevice&&(
+            {this.applicantDeviceStr&&(
               <div class="sb-device">
-                <span class="sb-device-icon">{this.applicantDevice.deviceType==='Mobile'?'📱':this.applicantDevice.deviceType==='Tablet'?'🖥️':'💻'}</span>
-                <span class="sb-device-info">{this.applicantDevice.os} · {this.applicantDevice.browser} · {this.applicantDevice.screen}</span>
+                <span class="sb-device-info">{this.applicantDeviceStr}</span>
               </div>
             )}
           </div>
