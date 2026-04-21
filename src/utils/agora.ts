@@ -26,13 +26,16 @@ async function getAgoraRTC(): Promise<any> {
 // Works instantly on same device across tabs/windows.
 // For cross-device: applicant writes signal to sessionStorage key via API,
 // agent polls the API every 2s.
-const SIGNAL_CHANNEL = 'vkyc-signal';
+const SIGNAL_CHANNEL       = 'vkyc-signal';        // applicant → agent
+const SIGNAL_AGENT_CHANNEL = 'vkyc-agent-signal';  // agent → applicant
 const API_BASE = () => (window as any).__VKYC_API__ || 'http://localhost:3001/api/v1';
 
 export class VkycSignal {
   private bc: BroadcastChannel | null = null;
+  private bcAgent: BroadcastChannel | null = null; // listens for agent→applicant
   private pollTimer: any = null;
   onMessage: (data: any) => void = () => {};
+  onAgentMessage: (data: any) => void = () => {}; // applicant listens to agent commands
 
   // Applicant: send signal via BroadcastChannel + API
   async send(data: object): Promise<void> {
@@ -92,9 +95,50 @@ export class VkycSignal {
     }, 2000);
   }
 
+  // Agent → Applicant: send command (code, flip, etc.)
+  sendToApplicant(data: object): void {
+    console.log('[Signal] Agent→Applicant:', data);
+    try {
+      const bc = new BroadcastChannel(SIGNAL_AGENT_CHANNEL);
+      bc.postMessage(data);
+      bc.close();
+    } catch(e) { console.warn('[Signal] Agent→Applicant BC failed:', e); }
+    // Also post to API for cross-device
+    fetch(API_BASE() + '/agent-signal', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(data)
+    }).catch(()=>{});
+  }
+
+  // Applicant: listen for agent commands
+  listenForAgent(): void {
+    // BroadcastChannel for same device
+    try {
+      this.bcAgent = new BroadcastChannel(SIGNAL_AGENT_CHANNEL);
+      this.bcAgent.onmessage = (evt) => {
+        console.log('[Signal] Agent command received:', evt.data);
+        this.onAgentMessage(evt.data);
+      };
+    } catch(e) {}
+
+    // Poll API for cross-device
+    setInterval(async () => {
+      try {
+        const res = await fetch(API_BASE() + '/agent-signal');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data?.type && data.type !== 'none') {
+          this.onAgentMessage(data);
+          await fetch(API_BASE() + '/agent-signal', { method: 'DELETE' });
+        }
+      } catch(e) {}
+    }, 1000);
+  }
+
   stop(): void {
-    this.bc?.close();
-    this.bc = null;
+    this.bc?.close(); this.bc = null;
+    this.bcAgent?.close(); this.bcAgent = null;
     if (this.pollTimer) { clearInterval(this.pollTimer); this.pollTimer = null; }
   }
 }

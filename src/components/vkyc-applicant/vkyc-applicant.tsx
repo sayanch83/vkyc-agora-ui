@@ -54,6 +54,10 @@ export class VkycApplicant {
   private livenessStream: MediaStream|null = null;
   @State() remoteUid: number|null = null;
   @State() callError = '';
+  @State() agentName = 'KYC Agent';
+  @State() agentId = 'AGT001';
+  @State() receivedCode: string|null = null;
+  @State() cameraFlipped = false;
 
   private _cachedSlots: Array<{date:string;label:string;slots:Array<{time:string;available:boolean}>}>|null = null;
   private generateSlots(): Array<{date:string;label:string;slots:Array<{time:string;available:boolean}>}> {
@@ -276,6 +280,30 @@ export class VkycApplicant {
 
       // Play own video — wait for #agora-self to appear
       this.playWhenReady('agora-self', (el) => this.call!.playLocal(el));
+
+      // Listen for agent commands (name, code, flip)
+      if (!this.signal) this.signal = new VkycSignal();
+      this.signal.onAgentMessage = (data: any) => {
+        console.log('[Applicant] Agent command:', data);
+        if (data.type === 'agent-info') {
+          this.agentName = data.agentName || 'KYC Agent';
+          this.agentId   = data.agentId   || 'AGT001';
+        }
+        if (data.type === 'show-code') {
+          this.receivedCode = data.code;
+          this.sessionSubStep = 'code';
+        }
+        if (data.type === 'flip-camera') {
+          this.cameraFlipped = !this.cameraFlipped;
+          // Flip the video element via CSS
+          const root = this.el.shadowRoot || this.el;
+          const vid = root.querySelector('#agora-self video') as HTMLVideoElement;
+          if (vid) {
+            vid.style.transform = this.cameraFlipped ? 'scaleX(1)' : 'scaleX(-1)';
+          }
+        }
+      };
+      this.signal.listenForAgent();
 
     } catch (e: any) {
       this.callError = e.message;
@@ -616,7 +644,7 @@ export class VkycApplicant {
       <div class="session-fullscreen animate-in">
         {/* Left — Officer feed (Agora remote) */}
         <div class="session-half session-half--left">
-          <div class="session-name-tag">Officer · KYC Agent</div>
+          <div class="session-name-tag">{this.agentName} · {this.agentId}</div>
           {this.remoteUid===null&&(
             <div class="session-half-inner">
               <div class="officer-placeholder">
@@ -648,10 +676,14 @@ export class VkycApplicant {
           {!this.agentDone&&this.sessionSubStep!=='face'&&(
             <div class="session-step-bar">
               <div class="ssb-label">{stepLabel[this.sessionSubStep]}</div>
-              {this.sessionSubStep==='code'&&(
+              {this.sessionSubStep==='code'&&this.receivedCode&&(
                 <div class="ssb-code-row">
-                  {this.spokenCode.split('').map(ch=><div class="ssb-char">{ch}</div>)}
+                  <div class="ssb-code-label">Say each character aloud:</div>
+                  {this.receivedCode.split('').map(ch=><div class="ssb-char">{ch}</div>)}
                 </div>
+              )}
+              {this.sessionSubStep==='code'&&!this.receivedCode&&(
+                <div class="ssb-code-waiting">⏳ Officer is generating a code for you…</div>
               )}
               {this.codeConfirmed&&this.sessionSubStep!=='face'&&(
                 <div class="ssb-check">✓ Code confirmed</div>

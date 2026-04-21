@@ -131,6 +131,14 @@ export class VkycAgent {
       this.playWhenReady('agora-local', (el) => this.call!.playLocal(el));
 
       this.pushToast(`Connected to ${c.name}`,'info');
+      // Send agent info to applicant so their UI shows correct name
+      if (this.signal) {
+        this.signal.sendToApplicant({
+          type: 'agent-info',
+          agentName: 'Agent Kumar',
+          agentId: 'AGT001'
+        });
+      }
     } catch (e: any) {
       this.pushToast('Camera/mic error: ' + e.message,'error');
       this.sessionState='live';
@@ -407,6 +415,9 @@ export class VkycAgent {
             <button class={`sb-act ${!this.camOn?'sb-act--off':''}`} onClick={()=>{this.camOn=!this.camOn;this.call?.setCam(this.camOn);}}>
               {this.camOn?'📷':'📵'}<span>{this.camOn?'Camera':'Cam Off'}</span>
             </button>
+            <button class="sb-act" onClick={()=>this.sendFlipToApplicant()}>
+              🔄<span>Flip</span>
+            </button>
           </div>
 
           {/* Nav links — matching screenshot nav */}
@@ -590,7 +601,7 @@ export class VkycAgent {
                   <div class="tc-title">Spoken Code Verification</div>
                   <p class="tc-desc">Generate a code and ask the customer to repeat it aloud exactly.</p>
                   <div class="attempt-row"><span class="at-lbl">Attempts:</span>{[1,2,3].map(n=><span class={`at-dot ${this.codeAttempts>=n?(this.codeMaxRetry?'at-dot--fail':'at-dot--used'):''}`}>{n}</span>)}<span class="at-lbl">{this.codeAttempts}/3 used</span></div>
-                  {!this.codeVerified&&!this.codeMaxRetry&&<button class={`tc-btn ${this.codeAttempts>=3?'tc-btn--off':''}`} disabled={this.codeAttempts>=3} onClick={()=>this.genCode()}>🔄 {this.codeAttempts===0?'Generate Code':'New Code'}</button>}
+                  {!this.codeVerified&&!this.codeMaxRetry&&<button class={`tc-btn ${this.codeAttempts>=3?'tc-btn--off':''}`} disabled={this.codeAttempts>=3} onClick={()=>{ const c=this.genCode(); this.spokenCode=c; this.sendCodeToApplicant(c); }}>🔄 {this.codeAttempts===0?'Generate Code':'New Code'}</button>}
                   {this.spokenCode&&!this.codeMaxRetry&&(
                     <Fragment>
                       <div class="code-tiles">{this.spokenCode.split('').map(ch=><div class="code-tile">{ch}</div>)}</div>
