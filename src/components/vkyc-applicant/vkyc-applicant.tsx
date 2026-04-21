@@ -172,15 +172,20 @@ export class VkycApplicant {
     // Open camera immediately so applicant sees themselves
     try {
       this.livenessStream = await navigator.mediaDevices.getUserMedia({ video:true, audio:false });
-      // Attach stream to video element once DOM renders
-      setTimeout(() => {
-        const root = this.el.shadowRoot || this.el;
-        const vid = root.querySelector('#liveness-cam') as HTMLVideoElement;
-        if (vid && this.livenessStream) {
-          vid.srcObject = this.livenessStream;
-          vid.play().catch(()=>{});
+      // Attach stream — retry until element appears (Stencil renders async)
+      const attachCam = async () => {
+        for (let i = 0; i < 20; i++) {
+          const root = this.el.shadowRoot || this.el;
+          const vid = root.querySelector('#liveness-cam') as HTMLVideoElement;
+          if (vid) {
+            vid.srcObject = this.livenessStream;
+            try { await vid.play(); } catch {}
+            return;
+          }
+          await new Promise(r => setTimeout(r, 150));
         }
-      }, 300);
+      };
+      attachCam();
     } catch(e) {
       console.warn('Camera preview unavailable:', e);
     }
@@ -527,43 +532,47 @@ export class VkycApplicant {
     return (
       <div class="card animate-in">
         <div class="card-left card-left--dark">
-          {this.livenessPhase==='counting'?(
-            <Fragment>
-              <div class="countdown-ring">
-                <svg width="120" height="120" style={{transform:'rotate(-90deg)'}}>
-                  <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="8"/>
-                  <circle cx="60" cy="60" r="54" fill="none" stroke="#00897b" stroke-width="8"
-                    stroke-dasharray={`${circ}`} stroke-dashoffset={`${circ*(1-pct/100)}`} stroke-linecap="round"
-                    style={{transition:'stroke-dashoffset 0.9s ease'}}/>
-                </svg>
-                <div class="countdown-center">
-                  <span class="countdown-num">{this.countdown}</span>
-                  <small>sec</small>
+          {/* Camera preview — shown during all liveness phases */}
+          <div class="liveness-cam-box" style={{borderColor:ringColor, display: this.livenessPhase==='counting'?'flex':'block'}}>
+            <video id="liveness-cam" class="liveness-video" autoplay muted playsinline/>
+            {this.livenessPhase==='counting'&&(
+              <div class="countdown-overlay">
+                <div class="countdown-ring-sm">
+                  <svg width="90" height="90" style={{transform:'rotate(-90deg)'}}>
+                    <circle cx="45" cy="45" r="40" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="6"/>
+                    <circle cx="45" cy="45" r="40" fill="none" stroke="#D38C1B" stroke-width="6"
+                      stroke-dasharray={`${2*Math.PI*40}`}
+                      stroke-dashoffset={`${2*Math.PI*40*(1-pct/100)}`}
+                      stroke-linecap="round"
+                      style={{transition:'stroke-dashoffset 0.9s ease'}}/>
+                  </svg>
+                  <div class="countdown-center">
+                    <span class="countdown-num">{this.countdown}</span>
+                    <small>sec</small>
+                  </div>
                 </div>
               </div>
-              <div class="liveness-hints">
-                <div class="lh-item">👤 Face clearly visible</div>
-                <div class="lh-item">💡 Good lighting</div>
-                <div class="lh-item">🚫 No one else visible</div>
+            )}
+            {(this.livenessPhase==='pass'||this.livenessPhase==='fail')&&(
+              <div class={`liveness-overlay ${this.livenessPhase==='pass'?'liveness-overlay--pass':'liveness-overlay--fail'}`}>
+                {this.livenessPhase==='pass'?'✓':'✗'}
               </div>
-            </Fragment>
-          ):(
-            <Fragment>
-              <div class="liveness-cam-box" style={{borderColor:ringColor}}>
-                <video id="liveness-cam" class="liveness-video" autoplay muted playsinline/>
-                {(this.livenessPhase==='pass'||this.livenessPhase==='fail')&&(
-                  <div class={`liveness-overlay ${this.livenessPhase==='pass'?'liveness-overlay--pass':'liveness-overlay--fail'}`}>
-                    {this.livenessPhase==='pass'?'✓':'✗'}
-                  </div>
-                )}
-              </div>
-              <div class="liveness-bar-wrap">
-                <div class="liveness-bar-fill" style={{
-                  width:({opening:'15%',capturing:'55%',analysing:'82%',pass:'100%',fail:'100%'} as Record<string,string>)[this.livenessPhase]||'0%',
-                  background:ringColor
-                }} />
-              </div>
-            </Fragment>
+            )}
+          </div>
+          {this.livenessPhase!=='counting'&&(
+            <div class="liveness-bar-wrap">
+              <div class="liveness-bar-fill" style={{
+                width:({opening:'15%',capturing:'55%',analysing:'82%',pass:'100%',fail:'100%'} as Record<string,string>)[this.livenessPhase]||'0%',
+                background:ringColor
+              }} />
+            </div>
+          )}
+          {this.livenessPhase==='counting'&&(
+            <div class="liveness-hints">
+              <div class="lh-item">👤 Face clearly visible</div>
+              <div class="lh-item">💡 Good lighting</div>
+              <div class="lh-item">🚫 No one else visible</div>
+            </div>
           )}
         </div>
         <div class="card-right">

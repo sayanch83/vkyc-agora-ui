@@ -488,3 +488,29 @@
   position: relative;
   overflow: hidden;
 }
+
+/* ── Countdown overlay on top of live camera ──────────────── */
+.countdown-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.35);
+  z-index: 3;
+}
+.countdown-ring-sm {
+  position: relative;
+  width: 90px;
+  height: 90px;
+}
+.liveness-cam-box {
+  position: relative;
+  overflow: hidden;
+  min-height: 160px;
+  border-radius: 12px;
+  border: 3px solid;
+  background: #0d1a2d;
+  align-items: center;
+  justify-content: center;
+}

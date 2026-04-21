@@ -56,23 +56,28 @@ export class VkycAgent {
   @State() remoteUid: number|null = null;
   @State() pendingApplicant: {name:string;caseId:string}|null = null;
 
-  async componentWillLoad() {
-    // Connect to RTM signal channel to listen for applicant ready events
+  async componentDidLoad() {
+    // Connect to RTM AFTER component renders (componentDidLoad is safer than componentWillLoad)
+    await this.connectSignal();
+  }
+
+  private async connectSignal() {
     try {
       this.signal = new VkycSignal();
-      await this.signal.connect('agent-001');
+      // Use timestamp to avoid UID conflicts if agent opens multiple tabs
+      await this.signal.connect('agent-' + Date.now());
       this.signal.onMessage = (data: any) => {
         if (data.type === 'applicant-ready') {
-          // Find the matching case or use the demo case
           const matched = this.cases.find(c => c.id === data.caseId) || this.cases[0];
           this.pendingApplicant = { name: data.name, caseId: matched.id };
-          this.showAdmitModal = true;
           this.activeCase = matched;
           this.cases = this.cases.map(x => x.id===matched.id ? {...x, status:'in-progress'} : x);
+          this.showAdmitModal = true;
         }
       };
+      console.log('[VKYC Agent] RTM connected, listening for applicants…');
     } catch(e) {
-      console.warn('RTM signal failed, demo mode only:', e);
+      console.warn('[VKYC Agent] RTM connection failed:', e);
     }
   }
 
