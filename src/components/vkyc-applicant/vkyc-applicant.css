@@ -661,3 +661,15 @@
 .session-done-icon { font-size: 48px; color: #00897b; }
 .session-done-title { font-size: 18px; font-weight: 700; color: #fff; text-align: center; }
 .session-done-sub { font-size: 13px; color: rgba(255,255,255,0.6); text-align: center; }
+
+/* ── Full-screen session end overlay ───────────────────────── */
+.session-end-overlay {
+  position: absolute; inset: 0; z-index: 50;
+  background: rgba(10,18,31,0.92);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 14px;
+  backdrop-filter: blur(6px);
+}
+.session-end-icon { font-size: 56px; color: #00897b; }
+.session-end-title { font-size: 22px; font-weight: 700; color: #fff; text-align: center; }
+.session-end-sub { font-size: 14px; color: rgba(255,255,255,0.65); text-align: center; }

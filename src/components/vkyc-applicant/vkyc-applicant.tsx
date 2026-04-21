@@ -684,6 +684,14 @@ export class VkycApplicant {
     };
     return (
       <div class="session-fullscreen animate-in">
+        {/* Full-screen completion overlay — shown when agent ends session */}
+        {this.agentDone&&(
+          <div class="session-end-overlay">
+            <div class="session-end-icon">✓</div>
+            <div class="session-end-title">VKYC Completed</div>
+            <div class="session-end-sub">You will be disconnected shortly…</div>
+          </div>
+        )}
         {/* Left — Officer feed (Agora remote) */}
         <div class="session-half session-half--left">
           <div class="session-name-tag">{this.agentName} · {this.agentId}</div>
@@ -709,13 +717,6 @@ export class VkycApplicant {
           <div class="session-name-tag session-name-tag--right">You</div>
           <div id="agora-self" class="agora-video-box agora-video-box--fullhalf">
             <video id="self-video" autoplay playsinline muted style={{position:'absolute',inset:'0',width:'100%',height:'100%',objectFit:'cover',background:'#111'}}/>
-            {this.agentDone&&(
-              <div class="session-done-overlay">
-                <div class="session-done-icon">✓</div>
-                <div class="session-done-title">VKYC Completed</div>
-                <div class="session-done-sub">You will be disconnected shortly…</div>
-              </div>
-            )}
           </div>
 
           {/* Received code — show whenever agent sends it, regardless of subStep */}
