@@ -221,13 +221,6 @@ export class VkycApplicant {
   }
 
 
-  private simulate() {
-    let t=0; const tim=setInterval(()=>{t++;this.sessionSecs=t;},1000);
-    setTimeout(()=>{this.sessionSubStep='code';},6000);
-    setTimeout(()=>{this.codeConfirmed=true;this.sessionSubStep='pan';this.toast$('Agent confirmed your spoken code ✓','success');},14000);
-    setTimeout(()=>{this.panCaptured=true;this.sessionSubStep='waiting';this.toast$('Agent captured your PAN card ✓','success');},22000);
-    setTimeout(()=>{clearInterval(tim);this.referenceId='VKP-'+Math.random().toString(36).substr(2,8).toUpperCase();this.agentDone=true;setTimeout(()=>{this.step='complete';},2500);},30000);
-  }
 
   private visibleSteps() { return APPLICANT_STEPS.filter(s=>s.id!=='aadhaar'); }
   private stepIdx() { return this.visibleSteps().findIndex(s=>s.id===this.step); }
