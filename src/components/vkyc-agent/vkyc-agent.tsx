@@ -84,14 +84,6 @@ export class VkycAgent {
     setTimeout(()=>{ this.toasts=this.toasts.filter(t=>t.id!==id); },4000);
   }
 
-  private async acceptCase(c: typeof MOCK_CASES[0]) {
-    // Agent manually accepts from dashboard — go straight to session
-    this.activeCase = c;
-    this.cases = this.cases.map(x=>x.id===c.id?{...x,status:'in-progress'}:x);
-    this.view = 'session';
-    await this.startAgoraCall();
-  }
-
   // Retry playing video into element until it appears in DOM (max 20 tries)
   private async playWhenReady(elementId: string, playFn: (el: HTMLElement) => void, retries = 20) {
     for (let i = 0; i < retries; i++) {
