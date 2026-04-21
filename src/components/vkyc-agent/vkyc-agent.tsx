@@ -342,19 +342,7 @@ export class VkycAgent {
     return (
       <div class="session-wrap animate-in">
 
-        {/* Admit modal */}
-        {this.showAdmitModal&&(
-          <div class="modal-overlay">
-            <div class="modal-card animate-in">
-              <div class="modal-title">Customer Requesting to Join</div>
-              <div class="modal-body">Allow <strong>{this.pendingApplicant?.name||c.name}</strong> to enter the V-CIP session? They have completed pre-liveness check and are ready to connect.</div>
-              <div class="modal-actions">
-                <button class="btn-deny" onClick={()=>{this.showAdmitModal=false;this.pendingApplicant=null;this.activeCase=null;this.view='dashboard';this.cases=MOCK_CASES.map(c=>({...c}));}}>Deny</button>
-                <button class="btn-admit" onClick={()=>{this.showAdmitModal=false;this.view='session';this.startAgoraCall();}}>Allow</button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Admit modal moved to top-level render */}
 
         {/* LEFT SIDEBAR — matches screenshot pattern */}
         <div class="col-left">
@@ -768,6 +756,23 @@ export class VkycAgent {
   render() {
     return (
       <div class="vkyc-agent">
+
+        {/* Admit modal — top level so visible on dashboard AND session */}
+        {this.showAdmitModal&&(
+          <div class="modal-overlay">
+            <div class="modal-card animate-in">
+              <div class="modal-title">🔔 Customer Ready to Join</div>
+              <div class="modal-body">
+                <strong>{this.pendingApplicant?.name||this.activeCase?.name}</strong> has completed liveness verification and is requesting to join the V-CIP session.
+              </div>
+              <div class="modal-actions">
+                <button class="btn-deny" onClick={()=>{this.showAdmitModal=false;this.pendingApplicant=null;this.activeCase=null;this.view='dashboard';this.cases=MOCK_CASES.map(c=>({...c}));}}>Deny</button>
+                <button class="btn-admit" onClick={()=>{this.showAdmitModal=false;this.view='session';this.startAgoraCall();}}>Allow</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <header class="agent-header">
           <div class="agent-header-inner">
             <div class="brand"><div class="brand-mark"><span class="bv">V</span><span class="bk">KYC</span></div><div class="brand-text"><div class="brand-name">{this.view==='dashboard'?'Officer Dashboard':'Live KYC Session'}</div><div class="brand-sub">RBI V-CIP · Officer Portal</div></div></div>

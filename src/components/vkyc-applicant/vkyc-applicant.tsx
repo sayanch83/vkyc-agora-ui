@@ -205,10 +205,14 @@ export class VkycApplicant {
     if(s>=75){
       // Stop liveness camera — MUST fully release before Agora opens it
       if(this.livenessStream) {
-        this.livenessStream.getTracks().forEach(t=>t.stop());
-        this.livenessStream=null;
+        this.livenessStream.getTracks().forEach(t=>{ t.stop(); t.enabled=false; });
+        this.livenessStream = null;
+        // Also clear any video element srcObject
+        const root = this.el.shadowRoot || this.el;
+        const vid = root.querySelector('#liveness-cam') as HTMLVideoElement;
+        if(vid) { vid.srcObject=null; vid.load(); }
       }
-      await this.delay(800); // give browser time to release camera hardware
+      await this.delay(1500); // give browser time to fully release camera hardware
       this.step='session';
       // Signal agent — popup appears on agent screen
       await this.notifyAgentReady();
