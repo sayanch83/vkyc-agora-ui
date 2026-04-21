@@ -177,6 +177,10 @@ export class VkycAgent {
   }
 
   private endSession() {
+    // Notify applicant that session is ending
+    if(this.signal) {
+      this.signal.sendToApplicant({ type: 'session-ended', decision: this.decision || 'disconnect' });
+    }
     if(this.call){this.call.leave();this.call=null;}
     if(this.signal){this.signal.stop();this.signal=null;}
     this.pendingApplicant=null;
@@ -657,7 +661,7 @@ export class VkycAgent {
                   {this.spokenCode&&!this.codeMaxRetry&&(
                     <Fragment>
                       <div class="code-tiles">{this.spokenCode.split('').map(ch=><div class="code-tile">{ch}</div>)}</div>
-                      {!this.codeVerified&&<div class="code-actions"><button class="tc-btn tc-btn--ok" onClick={()=>{this.codeVerified=true;this.pushToast('Code Verified ✓','success');}}>✅ Mark Verified</button>{this.codeAttempts>=3&&<button class="tc-btn tc-btn--danger" onClick={()=>{this.codeMaxRetry=true;this.pushToast('Max retry exceeded','error');}}>⛔ Max Retry</button>}</div>}
+                      {!this.codeVerified&&<div class="code-actions"><button class="tc-btn tc-btn--ok" onClick={()=>{this.codeVerified=true;this.pushToast('Code Verified ✓','success');if(this.signal)this.signal.sendToApplicant({type:'code-verified'});}}>✅ Mark Verified</button>{this.codeAttempts>=3&&<button class="tc-btn tc-btn--danger" onClick={()=>{this.codeMaxRetry=true;this.pushToast('Max retry exceeded','error');}}>⛔ Max Retry</button>}</div>}
                     </Fragment>
                   )}
                   {this.codeVerified&&<div class="result-ok">✅ Code Verified Successfully</div>}

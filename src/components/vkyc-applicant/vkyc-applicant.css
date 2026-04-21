@@ -649,3 +649,15 @@
 }
 .cs-done { background: #f0fdf4; color: #166534; }
 .cs-pending { background: #f8fafc; color: #64748b; }
+
+/* ── Session done overlay ────────────────────────────────── */
+.session-done-overlay {
+  position: absolute; inset: 0; z-index: 20;
+  background: rgba(10,18,31,0.88);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 10px;
+  backdrop-filter: blur(4px);
+}
+.session-done-icon { font-size: 48px; color: #00897b; }
+.session-done-title { font-size: 18px; font-weight: 700; color: #fff; text-align: center; }
+.session-done-sub { font-size: 13px; color: rgba(255,255,255,0.6); text-align: center; }

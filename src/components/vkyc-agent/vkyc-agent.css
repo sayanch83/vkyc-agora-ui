@@ -533,14 +533,14 @@
 
 /* ── Video feed panels in left sidebar ───────────────────── */
 .vid-cust {
-  flex: 0 0 160px;
+  flex: 0 0 220px;
   background: linear-gradient(160deg, #0d1a2d, #1a2f5e);
   position: relative; display: flex; align-items: center;
   justify-content: center; border-bottom: 1px solid rgba(255,255,255,0.08);
   border-top: 1px solid rgba(255,255,255,0.06);
 }
 .vid-agent {
-  flex: 0 0 80px;
+  flex: 0 0 120px;
   background: #0a121f;
   position: relative; display: flex; align-items: center;
   justify-content: center; border-bottom: 1px solid rgba(255,255,255,0.08);
@@ -610,7 +610,7 @@
 .vid-cust {
   position: relative;
   overflow: hidden;
-  min-height: 160px;
+  min-height: 220px;
 }
 .vid-waiting {
   position: absolute; inset: 0;
@@ -622,7 +622,7 @@
 .vid-agent {
   position: relative;
   overflow: hidden;
-  min-height: 80px;
+  min-height: 120px;
 }
 
 /* ── Dashboard case status labels ────────────────────────── */

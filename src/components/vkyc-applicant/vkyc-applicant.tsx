@@ -279,6 +279,22 @@ export class VkycApplicant {
         this.receivedCode = data.code;
         this.sessionSubStep = 'code';
       }
+      if (data.type === 'code-verified') {
+        // Agent verified the code — hide it from applicant screen
+        this.receivedCode = null;
+        this.sessionSubStep = 'face';
+      }
+      if (data.type === 'session-ended') {
+        // Agent disconnected — notify applicant and auto-disconnect
+        this.agentDone = true;
+        this.referenceId = this.referenceId || ('VKP-' + Math.random().toString(36).substr(2,8).toUpperCase());
+        // Show message then redirect to complete
+        setTimeout(() => {
+          if(this.call){this.call.leave();this.call=null;}
+          clearInterval((this as any)._sessionTimer);
+          this.step = 'complete';
+        }, 3000);
+      }
       if (data.type === 'flip-camera') {
         if (this.call) {
           this.call.switchCamera().catch(e => console.warn('[Applicant] Camera switch failed:', e));
@@ -696,7 +712,8 @@ export class VkycApplicant {
             {this.agentDone&&(
               <div class="session-done-overlay">
                 <div class="session-done-icon">✓</div>
-                <div>KYC Completed</div>
+                <div class="session-done-title">VKYC Completed</div>
+                <div class="session-done-sub">You will be disconnected shortly…</div>
               </div>
             )}
           </div>
