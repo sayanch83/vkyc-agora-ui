@@ -306,6 +306,9 @@ export class VkycAgent {
     this.cases=this.cases.map(x=>x.id===this.activeCase!.id?{...x,status:type==='approve'?'approved':type==='reject'?'rejected':'escalated'}:x);
     const msgs: Record<string,string>={approve:'KYC Approved ✓',reject:'KYC Rejected'};
     this.pushToast(msgs[type!]??'Done',type==='approve'?'success':'error');
+    // Auto-disconnect after 5 seconds
+    this.pushToast('Session will end in 5 seconds…','info');
+    setTimeout(() => { this.endSession(); }, 5000);
   }
 
   /* ── DASHBOARD ── */
@@ -419,13 +422,17 @@ export class VkycAgent {
                 <div class="vid-sub">{this.sessionState==='connecting'?'Connecting…':'Waiting for customer…'}</div>
               </div>
             )}
-            <div id="agora-remote" class="agora-video-box agora-video-box--remote"/>
+            <div id="agora-remote" class="agora-video-box agora-video-box--remote">
+              <video id="remote-video" autoplay playsinline style={{position:'absolute',inset:'0',width:'100%',height:'100%',objectFit:'cover',background:'#111'}}/>
+            </div>
           </div>
 
           {/* Agent PiP — Agora local */}
           <div class="vid-agent">
             <div class="vid-tag vid-tag--right">You · Agent Kumar</div>
-            <div id="agora-local" class="agora-video-box agora-video-box--local"/>
+            <div id="agora-local" class="agora-video-box agora-video-box--local">
+              <video id="local-video" autoplay playsinline muted style={{position:'absolute',inset:'0',width:'100%',height:'100%',objectFit:'cover',background:'#111'}}/>
+            </div>
           </div>
 
           {/* Quick actions */}
@@ -438,6 +445,9 @@ export class VkycAgent {
             </button>
             <button class="sb-act" onClick={()=>this.sendFlipToApplicant()}>
               🔄<span>Flip</span>
+            </button>
+            <button class="sb-act sb-act--end" onClick={()=>{if(confirm('End this KYC session?'))this.endSession();}}>
+              📵<span>End</span>
             </button>
           </div>
 

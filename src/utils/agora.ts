@@ -108,46 +108,30 @@ export class VkycCall {
   onRemoteLeft:   (uid: any) => void = () => {};
   onError:        (msg: string) => void = () => {};
 
-  // Play a track into a container — reuses existing video element
+  // Play a track into the pre-existing <video> element inside container
   private playInto(track: any, container: HTMLElement, muted = true): void {
     if (!track || !container) { console.warn('[RTC] playInto: missing track or container'); return; }
-    console.log('[RTC] playInto called, container:', container.id || container.className, 'muted:', muted);
+    console.log('[RTC] playInto:', container.id, 'muted:', muted);
     try {
       const mediaTrack: MediaStreamTrack = track.getMediaStreamTrack();
       if (!mediaTrack) { console.warn('[RTC] no mediaStreamTrack'); return; }
-      
-      // Reuse existing video or create new one
-      let vid = container.querySelector('video') as HTMLVideoElement;
-      if (vid) {
-        // Update existing video's stream
-        const existing = vid.srcObject as MediaStream;
-        if (existing) {
-          existing.getVideoTracks().forEach(t => existing.removeTrack(t));
-          existing.addTrack(mediaTrack);
-          console.log('[RTC] Updated existing video srcObject');
-        } else {
-          vid.srcObject = new MediaStream([mediaTrack]);
-        }
-      } else {
-        vid = document.createElement('video');
-        vid.autoplay = true;
-        vid.playsInline = true;
-        vid.muted = muted;
-        vid.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#111;';
-        vid.srcObject = new MediaStream([mediaTrack]);
-        container.style.position = 'relative';
-        container.appendChild(vid);
-        console.log('[RTC] Created new video element');
+      // Use the pre-existing <video> element from JSX — never create a new one
+      const vid = container.querySelector('video') as HTMLVideoElement;
+      if (!vid) { console.error('[RTC] No <video> element found in container:', container.id); return; }
+      vid.muted = muted;
+      vid.srcObject = new MediaStream([mediaTrack]);
+      const playPromise = vid.play();
+      if (playPromise) {
+        playPromise
+          .then(() => console.log('[RTC] Video playing in:', container.id))
+          .catch(e => {
+            console.warn('[RTC] play() failed:', e, '- trying muted');
+            vid.muted = true;
+            vid.play().catch(e2 => console.error('[RTC] muted play also failed:', e2));
+          });
       }
-      vid.play().catch(e => {
-        console.warn('[RTC] play() failed:', e);
-        vid.muted = true;
-        vid.play().catch(() => {});
-      });
     } catch(e) {
-      console.warn('[RTC] playInto native failed:', e);
-      try { track.play(container); console.log('[RTC] Agora fallback succeeded'); } 
-      catch(e2) { console.error('[RTC] Both play methods failed:', e2); }
+      console.warn('[RTC] playInto failed:', e);
     }
   }
 

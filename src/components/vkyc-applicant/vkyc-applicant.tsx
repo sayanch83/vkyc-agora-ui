@@ -661,7 +661,9 @@ export class VkycApplicant {
               </div>
             </div>
           )}
-          <div id="agora-agent" class="agora-video-box agora-video-box--fullhalf"/>
+          <div id="agora-agent" class="agora-video-box agora-video-box--fullhalf">
+            <video id="agent-video" autoplay playsinline style={{position:'absolute',inset:'0',width:'100%',height:'100%',objectFit:'cover',background:'#111'}}/>
+          </div>
           <div class="session-controls-bar">
             <div class="rec-pill"><span class="rec-dot"/>REC</div>
             <div class="session-time">{this.fmt(this.sessionSecs)}</div>
@@ -672,6 +674,7 @@ export class VkycApplicant {
         <div class="session-half session-half--right">
           <div class="session-name-tag session-name-tag--right">You</div>
           <div id="agora-self" class="agora-video-box agora-video-box--fullhalf">
+            <video id="self-video" autoplay playsinline muted style={{position:'absolute',inset:'0',width:'100%',height:'100%',objectFit:'cover',background:'#111'}}/>
             {this.agentDone&&(
               <div class="session-done-overlay">
                 <div class="session-done-icon">✓</div>
@@ -736,13 +739,13 @@ export class VkycApplicant {
             <div class="ref-note">Save this for tracking your KYC status</div>
           </div>
 
-          <div class="complete-timeline">
-            <div class="ct-step ct-done">✅ Session Recorded</div>
-            <div class="ct-step ct-done">✅ Identity Verified</div>
-            <div class="ct-step ct-pending">📋 Auditor Review — In Progress</div>
-            <div class="ct-step ct-pending">📱 SMS Notification on Approval</div>
+          <div class="complete-steps">
+            <div class="cs-item cs-done">✅ Session recorded and encrypted</div>
+            <div class="cs-item cs-done">✅ Identity verified successfully</div>
+            <div class="cs-item cs-pending">📋 Auditor review — in progress</div>
+            <div class="cs-item cs-pending">📱 You will receive an SMS on approval</div>
           </div>
-          <p class="rbi-note" style={{marginTop:'20px'}}>Typical processing time: 2–4 business hours. This V-CIP was conducted under RBI Master Direction on KYC.</p>
+          <p class="rbi-note" style={{marginTop:'16px'}}>Typical processing time: 2–4 business hours. Conducted under RBI Master Direction on KYC.</p>
         </div>
       </div>
     );
