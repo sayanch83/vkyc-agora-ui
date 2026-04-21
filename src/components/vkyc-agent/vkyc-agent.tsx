@@ -230,6 +230,18 @@ export class VkycAgent {
     const code=Array.from({length:6},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random()*32)]).join('');
     this.spokenCode=code; this.codeAttempts=this.codeAttempts+1; this.codeVerified=false;
     this.pushToast(`Code generated — attempt ${this.codeAttempts}/3`,'info');
+    // Send code to applicant screen
+    if(this.signal) {
+      this.signal.sendToApplicant({ type:'show-code', code });
+      this.pushToast('Code sent to applicant','info');
+    }
+  }
+
+  private sendFlipToApplicant() {
+    if(this.signal) {
+      this.signal.sendToApplicant({ type:'flip-camera' });
+      this.pushToast('Flip command sent','info');
+    }
   }
 
   // Capture a frame from the live Agora remote video stream
@@ -601,7 +613,7 @@ export class VkycAgent {
                   <div class="tc-title">Spoken Code Verification</div>
                   <p class="tc-desc">Generate a code and ask the customer to repeat it aloud exactly.</p>
                   <div class="attempt-row"><span class="at-lbl">Attempts:</span>{[1,2,3].map(n=><span class={`at-dot ${this.codeAttempts>=n?(this.codeMaxRetry?'at-dot--fail':'at-dot--used'):''}`}>{n}</span>)}<span class="at-lbl">{this.codeAttempts}/3 used</span></div>
-                  {!this.codeVerified&&!this.codeMaxRetry&&<button class={`tc-btn ${this.codeAttempts>=3?'tc-btn--off':''}`} disabled={this.codeAttempts>=3} onClick={()=>{ const c=this.genCode(); this.spokenCode=c; this.sendCodeToApplicant(c); }}>🔄 {this.codeAttempts===0?'Generate Code':'New Code'}</button>}
+                  {!this.codeVerified&&!this.codeMaxRetry&&<button class={`tc-btn ${this.codeAttempts>=3?'tc-btn--off':''}`} disabled={this.codeAttempts>=3} onClick={()=>this.genCode()}>🔄 {this.codeAttempts===0?'Generate Code':'New Code'}</button>}
                   {this.spokenCode&&!this.codeMaxRetry&&(
                     <Fragment>
                       <div class="code-tiles">{this.spokenCode.split('').map(ch=><div class="code-tile">{ch}</div>)}</div>

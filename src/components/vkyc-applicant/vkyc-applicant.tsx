@@ -47,7 +47,6 @@ export class VkycApplicant {
   @State() toast: {msg:string;type:string}|null = null;
 
   @Element() el!: HTMLElement;
-  private spokenCode = this.genCode();
   private cdTimer: any = null;
   private call: VkycCall|null = null;
   private signal: VkycSignal|null = null;
@@ -120,9 +119,6 @@ export class VkycApplicant {
     }
   }
 
-  private genCode() {
-    return Array.from({length:6}, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random()*32)]).join('');
-  }
   private startQueueSimulation() {
     // Simulate queue: every 4 seconds reduce position by 1, waitMins by 2
     this.queueTimer = setInterval(()=>{
