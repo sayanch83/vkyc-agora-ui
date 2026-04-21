@@ -396,12 +396,12 @@ export class VkycAgent {
       result.father = lines[fatherIdx+1].replace(/[^A-Z\s]/g,'').trim();
     }
 
-    // Fallback — 2 longest purely uppercase lines that aren't keywords
-    const keywords = /INCOME|TAX|DEPT|GOVT|INDIA|PERMANENT|ACCOUNT|NUMBER|DATE|BIRTH|SIGN/;
+    // Fallback — find uppercase name lines in document order (preserving PAN card layout)
+    // PAN card order: header lines → applicant name → father name → DOB
+    const keywords = /INCOME|TAX|DEPT|GOVT|INDIA|PERMANENT|ACCOUNT|NUMBER|DATE|BIRTH|SIGN|SIGNATURE/;
     const nameLines = lines
-      .filter(l => /^[A-Z][A-Z\s]{3,}$/.test(l) && !keywords.test(l) && l.length > 3)
-      .sort((a,b) => b.length - a.length);
-
+      .filter(l => /^[A-Z][A-Z\s]{3,}$/.test(l) && !keywords.test(l) && l.length > 3);
+    // Preserve document order — first qualifying line = name, second = father
     if (!result.name   && nameLines[0]) result.name   = nameLines[0].trim();
     if (!result.father && nameLines[1]) result.father = nameLines[1].trim();
 
@@ -459,30 +459,28 @@ export class VkycAgent {
       const parsed = this.parsePanText(raw);
       const c = this.activeCase!;
 
-      // Fill in from application data if OCR missed something
+      // Use ONLY what OCR found — never fall back to stub data
       this.ocrData = {
-        name:   parsed.name   || c.name.toUpperCase(),
-        pan:    parsed.pan    || c.pan,
-        dob:    parsed.dob    || c.dob,
-        father: parsed.father || c.father.toUpperCase(),
+        name:   parsed.name   || '— Not detected —',
+        pan:    parsed.pan    || '— Not detected —',
+        dob:    parsed.dob    || '— Not detected —',
+        father: parsed.father || '— Not detected —',
       };
 
-      // Calculate match scores against application data
-      const nameScore = this.similarity(this.ocrData.name, c.name);
-      const panScore  = this.similarity(this.ocrData.pan,  c.pan);
+      // Calculate match scores — only when both sides have real data
+      const nameScore = parsed.name ? this.similarity(parsed.name, c.name) : 0;
+      const panScore  = parsed.pan  ? this.similarity(parsed.pan,  c.pan)  : 0;
       this.matchScores = { ...this.matchScores, name: nameScore, pan: panScore };
 
+      const detected = [parsed.name, parsed.pan, parsed.dob, parsed.father].filter(Boolean).length;
       this.ocrRunning = false;
-      this.pushToast('OCR complete ✓ — Name: '+nameScore+'% · PAN: '+panScore+'%','success');
+      this.pushToast('OCR complete ✓ — '+detected+'/4 fields detected · PAN: '+panScore+'%', detected>0?'success':'info');
 
     } catch(e: any) {
       console.error('[OCR] Failed:', e);
-      // Fallback to mock data
-      const c = this.activeCase!;
-      this.ocrData = { name:c.name.toUpperCase(), pan:c.pan, dob:c.dob, father:c.father.toUpperCase() };
-      this.matchScores = { ...this.matchScores, name:95, pan:99 };
-      this.ocrRunning  = false;
-      this.pushToast('OCR complete (fallback) ✓','success');
+      this.ocrData = { name:'— Error —', pan:'— Error —', dob:'— Error —', father:'— Error —' };
+      this.ocrRunning = false;
+      this.pushToast('OCR failed — try capturing again','error');
     }
   }
 
