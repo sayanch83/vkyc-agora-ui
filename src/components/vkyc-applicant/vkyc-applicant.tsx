@@ -291,8 +291,12 @@ export class VkycApplicant {
 
       this.call.onRemoteJoined = async (uid) => {
         this.remoteUid = uid;
-        const el = await this.waitForEl('agora-agent');
+        console.log('[Applicant] Remote joined uid:', uid);
+        let el = this.getEl('agora-agent');
+        if (!el) el = await this.waitForEl('agora-agent');
+        console.log('[Applicant] agora-agent found:', !!el);
         if (el) this.call!.playRemote(uid, el);
+        else console.error('[Applicant] Could not find agora-agent element');
       };
       this.call.onRemoteLeft = () => { this.remoteUid = null; };
       this.call.onError = (msg) => { this.callError = msg; };
@@ -305,7 +309,9 @@ export class VkycApplicant {
       await this.call.join(this.caseId, 1);
 
       // Play local after join
+      console.log('[Applicant] Playing local video, selfEl:', !!selfEl);
       if (selfEl) this.call.playLocal(selfEl);
+      else console.error('[Applicant] agora-self not found');
 
     } catch (e: any) {
       this.callError = e.message;

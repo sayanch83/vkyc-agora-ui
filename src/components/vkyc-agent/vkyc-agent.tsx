@@ -113,8 +113,13 @@ export class VkycAgent {
       this.call.onRemoteJoined = async (uid) => {
         this.remoteUid = uid;
         this.pushToast('Customer video connected','success');
-        const el = await this.waitForEl('agora-remote');
+        console.log('[Agent] Remote joined uid:', uid, '- looking for agora-remote');
+        // Try immediately first, then retry
+        let el = this.getEl('agora-remote');
+        if (!el) el = await this.waitForEl('agora-remote');
+        console.log('[Agent] agora-remote found:', !!el);
         if (el) this.call!.playRemote(uid, el);
+        else console.error('[Agent] Could not find agora-remote element');
       };
       this.call.onRemoteLeft = () => {
         this.remoteUid = null;
@@ -135,7 +140,9 @@ export class VkycAgent {
       await this.call.join(c.id, agentUid);
 
       // Play local immediately after join
+      console.log('[Agent] Playing local video, localEl:', !!localEl);
       if (localEl) this.call.playLocal(localEl);
+      else console.error('[Agent] agora-local not found');
 
       this.pushToast(`Connected to ${c.name}`,'info');
       if (this.signal) {
