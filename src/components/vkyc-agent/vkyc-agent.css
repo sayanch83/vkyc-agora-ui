@@ -418,12 +418,12 @@
 .pan-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .pan-slot-wrap {}
 .pan-slot-label { font-size: 11px; color: var(--text-2); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.3px; font-weight: 600; }
-.pan-slot { height: 85px; background: #f9fafb; border: 1.5px dashed var(--border); border-radius: 7px; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; margin-bottom: 7px; }
-.pan-img  { width: 100%; object-fit: cover; border-radius: 6px; }
+.pan-slot { height: 140px; background: #f9fafb; border: 1.5px dashed var(--border); border-radius: 7px; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; margin-bottom: 7px; }
+.pan-img  { width: 100%; height: 100%; object-fit: contain; border-radius: 6px; }
 .pan-empty { text-align: center; color: var(--text-3); font-size: 11px; }
 .pan-empty span { font-size: 20px; display: block; margin-bottom: 2px; }
-.sig-slot { height: 95px; background: #f9fafb; border: 1.5px dashed var(--border); border-radius: 7px; display: flex; align-items: center; justify-content: center; overflow: hidden; margin-bottom: 7px; }
-.sig-img  { width: 100%; object-fit: contain; }
+.sig-slot { height: 140px; background: #f9fafb; border: 1.5px dashed var(--border); border-radius: 7px; display: flex; align-items: center; justify-content: center; overflow: hidden; margin-bottom: 7px; }
+.sig-img  { width: 100%; height: 100%; object-fit: contain; }
 
 /* OCR table — label-value grid like screenshot detail panel */
 .ocr-ok-badge { background: #eff6ff; color: var(--cobalt); padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; display: inline-block; margin-bottom: 10px; border: 1px solid #bfdbfe; }

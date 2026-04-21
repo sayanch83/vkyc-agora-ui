@@ -361,23 +361,51 @@ export class VkycAgent {
   }
 
   private parsePanText(text: string): Record<string,string> {
-    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
     const result: Record<string,string> = {};
+    // Normalise — remove extra spaces, fix common OCR errors
+    const clean = text.replace(/[|]/g,'I').replace(/0/g,'O').toUpperCase();
+    const lines = clean.split('\n').map(l => l.trim()).filter(l => l.length > 1);
 
-    // PAN number — 10 chars: 5 letters, 4 digits, 1 letter
-    const panMatch = text.match(/[A-Z]{5}[0-9]{4}[A-Z]/);
-    if (panMatch) result.pan = panMatch[0];
+    // PAN number — 5 letters + 4 digits + 1 letter
+    // Try strict match first, then fuzzy (OCR often misreads chars)
+    const panStrict = text.toUpperCase().match(/[A-Z]{5}[0-9]{4}[A-Z]/);
+    if (panStrict) {
+      result.pan = panStrict[0];
+    } else {
+      // Fuzzy: look for 10-char alphanumeric clusters
+      const panFuzzy = text.toUpperCase().match(/[A-Z0-9]{10}/);
+      if (panFuzzy) result.pan = panFuzzy[0];
+    }
 
-    // DOB — DD/MM/YYYY or DD-MM-YYYY
-    const dobMatch = text.match(/\d{2}[\/\-]\d{2}[\/\-]\d{4}/);
-    if (dobMatch) result.dob = dobMatch[0].replace(/-/g,'/');
+    // DOB — various formats: DD/MM/YYYY, DD-MM-YYYY, DD MM YYYY
+    const dobMatch = text.match(/\d{1,2}[\s\/\-\.]\d{1,2}[\s\/\-\.]\d{4}/);
+    if (dobMatch) {
+      result.dob = dobMatch[0].replace(/[\s\.\-]/g,'/');
+    }
 
-    // Name and Father — usually the 2 longest uppercase lines
-    const upperLines = lines.filter(l => /^[A-Z\s]{3,}$/.test(l) && l.length > 3)
-                           .sort((a,b) => b.length - a.length);
-    if (upperLines[0]) result.name   = upperLines[0].trim();
-    if (upperLines[1]) result.father = upperLines[1].trim();
+    // Name — on PAN cards it appears after "Name" label or as a prominent uppercase line
+    // Look for line after "NAME" keyword
+    const nameIdx = lines.findIndex(l => /^NAME\b/.test(l));
+    if (nameIdx >= 0 && lines[nameIdx+1]) {
+      result.name = lines[nameIdx+1].replace(/[^A-Z\s]/g,'').trim();
+    }
 
+    // Father's name — appears after "FATHER" keyword
+    const fatherIdx = lines.findIndex(l => /FATHER|FAHER|F\.NAME/.test(l));
+    if (fatherIdx >= 0 && lines[fatherIdx+1]) {
+      result.father = lines[fatherIdx+1].replace(/[^A-Z\s]/g,'').trim();
+    }
+
+    // Fallback — 2 longest purely uppercase lines that aren't keywords
+    const keywords = /INCOME|TAX|DEPT|GOVT|INDIA|PERMANENT|ACCOUNT|NUMBER|DATE|BIRTH|SIGN/;
+    const nameLines = lines
+      .filter(l => /^[A-Z][A-Z\s]{3,}$/.test(l) && !keywords.test(l) && l.length > 3)
+      .sort((a,b) => b.length - a.length);
+
+    if (!result.name   && nameLines[0]) result.name   = nameLines[0].trim();
+    if (!result.father && nameLines[1]) result.father = nameLines[1].trim();
+
+    console.log('[OCR] Parsed:', result);
     return result;
   }
 
@@ -404,7 +432,24 @@ export class VkycAgent {
       this.pushToast('Running OCR on PAN front…','info');
 
       // Run OCR on PAN front image
-      const result = await Tesseract.recognize(this.panFront, 'eng', {
+      // Preprocess: increase contrast and convert to grayscale for better OCR
+      const preprocessImage = (src: string): Promise<string> => {
+        return new Promise(res => {
+          const img = new Image();
+          img.onload = () => {
+            const c = document.createElement('canvas');
+            c.width = img.width * 2; c.height = img.height * 2; // upscale 2x
+            const ctx = c.getContext('2d')!;
+            ctx.filter = 'grayscale(1) contrast(1.8) brightness(1.1)';
+            ctx.drawImage(img, 0, 0, c.width, c.height);
+            res(c.toDataURL('image/png'));
+          };
+          img.src = src;
+        });
+      };
+
+      const processedImg = await preprocessImage(this.panFront);
+      const result = await Tesseract.recognize(processedImg, 'eng', {
         logger: (m: any) => { if(m.status === 'recognizing text') console.log('[OCR]', Math.round(m.progress*100)+'%'); }
       });
 
