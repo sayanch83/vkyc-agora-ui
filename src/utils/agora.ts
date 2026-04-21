@@ -1,6 +1,6 @@
 // src/utils/agora.ts
-// Agora RTC for video/audio
-// Signalling via BroadcastChannel (same device) + API long-poll (cross device)
+// Agora RTC for video/audio call
+// Signalling: BroadcastChannel (same device) + API polling (cross device)
 
 const APP_ID = '15d6681ab3b049ad91ecc585cc645551';
 
@@ -22,88 +22,78 @@ async function getAgoraRTC(): Promise<any> {
   return _AgoraRTC;
 }
 
-// ── Signal: BroadcastChannel (same device) + sessionStorage flag ──────────────
-// Works instantly on same device across tabs/windows.
-// For cross-device: applicant writes signal to sessionStorage key via API,
-// agent polls the API every 2s.
 const SIGNAL_CHANNEL       = 'vkyc-signal';        // applicant → agent
 const SIGNAL_AGENT_CHANNEL = 'vkyc-agent-signal';  // agent → applicant
 const API_BASE = () => (window as any).__VKYC_API__ || 'http://localhost:3001/api/v1';
 
+// ── Signal ────────────────────────────────────────────────────────────────────
 export class VkycSignal {
   private bc: BroadcastChannel | null = null;
-  private bcAgent: BroadcastChannel | null = null; // listens for agent→applicant
+  private bcAgent: BroadcastChannel | null = null;
   private pollTimer: any = null;
+  private agentPollTimer: any = null;
   onMessage: (data: any) => void = () => {};
-  onAgentMessage: (data: any) => void = () => {}; // applicant listens to agent commands
+  onAgentMessage: (data: any) => void = () => {};
 
-  // Applicant: send signal via BroadcastChannel + API
+  // Applicant → Agent signal
   async send(data: object): Promise<void> {
-    console.log('[Signal] Sending:', data);
-    // 1. BroadcastChannel — works instantly on same device
+    console.log('[Signal] Sending to agent:', data);
     try {
       const bc = new BroadcastChannel(SIGNAL_CHANNEL);
       bc.postMessage(data);
       bc.close();
       console.log('[Signal] BroadcastChannel sent');
-    } catch(e) { console.warn('[Signal] BroadcastChannel failed:', e); }
+    } catch(e) { console.warn('[Signal] BC send failed:', e); }
 
-    // 2. Store in sessionStorage for same-browser fallback
     try {
       sessionStorage.setItem('vkyc_signal', JSON.stringify({...data, ts: Date.now()}));
-      console.log('[Signal] sessionStorage written');
     } catch(e) {}
 
-    // 3. POST to API for cross-device signalling
     try {
       await fetch(API_BASE() + '/signal', {
         method: 'POST',
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify(data)
       });
-      console.log('[Signal] API signal posted');
-    } catch(e) { console.warn('[Signal] API post failed (expected if API not running):', e); }
+      console.log('[Signal] API posted');
+    } catch(e) { console.warn('[Signal] API post failed:', e); }
   }
 
-  // Agent: listen via BroadcastChannel + poll API
+  // Agent listens for applicant-ready signal
   startListening(): void {
-    console.log('[Signal] Agent starting to listen…');
-
-    // BroadcastChannel — instant for same device
+    console.log('[Signal] Agent starting BroadcastChannel listener');
     try {
       this.bc = new BroadcastChannel(SIGNAL_CHANNEL);
       this.bc.onmessage = (evt) => {
-        console.log('[Signal] BroadcastChannel received:', evt.data);
+        console.log('[Signal] BC received:', evt.data);
         this.onMessage(evt.data);
       };
-      console.log('[Signal] BroadcastChannel listener active');
-    } catch(e) { console.warn('[Signal] BroadcastChannel not available:', e); }
+    } catch(e) { console.warn('[Signal] BC not available:', e); }
 
-    // Poll API every 2s for cross-device
+    let lastTs = 0;
     this.pollTimer = setInterval(async () => {
       try {
         const res = await fetch(API_BASE() + '/signal');
         if (!res.ok) return;
         const data = await res.json();
-        if (data?.type === 'applicant-ready') {
+        if (data?.type === 'applicant-ready' && data.ts !== lastTs) {
+          lastTs = data.ts || Date.now();
           console.log('[Signal] API poll received:', data);
           this.onMessage(data);
-          // Clear after receiving so it doesn't fire again
-          await fetch(API_BASE() + '/signal', { method: 'DELETE' });
         }
-      } catch(e) {} // API may not be running — silent fail
+      } catch(e) {}
     }, 2000);
   }
 
-  // Agent → Applicant: send command (code, flip, etc.)
+  // Agent → Applicant: send command
   sendToApplicant(data: object): void {
-    console.log('[Signal] Agent→Applicant:', data);
+    console.log('[Signal] Agent→Applicant BC:', data);
     try {
       const bc = new BroadcastChannel(SIGNAL_AGENT_CHANNEL);
       bc.postMessage(data);
       bc.close();
-    } catch(e) { console.warn('[Signal] Agent→Applicant BC failed:', e); }
-    // Also post to API for cross-device
+    } catch(e) {}
+
     fetch(API_BASE() + '/agent-signal', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
@@ -111,20 +101,20 @@ export class VkycSignal {
     }).catch(()=>{});
   }
 
-  // Applicant: listen for agent commands
+  // Applicant listens for agent commands
   listenForAgent(): void {
-    // BroadcastChannel for same device
+    console.log('[Signal] Applicant starting agent command listener');
     try {
       this.bcAgent = new BroadcastChannel(SIGNAL_AGENT_CHANNEL);
       this.bcAgent.onmessage = (evt) => {
-        console.log('[Signal] Agent command received:', evt.data);
+        console.log('[Signal] Agent command via BC:', evt.data);
         this.onAgentMessage(evt.data);
       };
-    } catch(e) {}
+      console.log('[Signal] Agent BC listener active on:', SIGNAL_AGENT_CHANNEL);
+    } catch(e) { console.warn('[Signal] Agent BC failed:', e); }
 
-    // Poll API every 1.5s for new agent commands using queue pattern
     let lastCmdId = 0;
-    setInterval(async () => {
+    this.agentPollTimer = setInterval(async () => {
       try {
         const res = await fetch(API_BASE() + '/agent-signal?after=' + lastCmdId);
         if (!res.ok) return;
@@ -133,7 +123,7 @@ export class VkycSignal {
           for (const cmd of data.commands) {
             if (cmd.id > lastCmdId) {
               lastCmdId = cmd.id;
-              console.log('[Signal] Agent command from API:', cmd);
+              console.log('[Signal] Agent command via API:', cmd);
               this.onAgentMessage(cmd);
             }
           }
@@ -146,6 +136,7 @@ export class VkycSignal {
     this.bc?.close(); this.bc = null;
     this.bcAgent?.close(); this.bcAgent = null;
     if (this.pollTimer) { clearInterval(this.pollTimer); this.pollTimer = null; }
+    if (this.agentPollTimer) { clearInterval(this.agentPollTimer); this.agentPollTimer = null; }
   }
 }
 
@@ -188,6 +179,39 @@ export class VkycCall {
     [this.localAudioTrack, this.localVideoTrack] =
       await AgoraRTC.createMicrophoneAndCameraTracks();
     await this.client.publish([this.localAudioTrack, this.localVideoTrack]);
+  }
+
+  // Play local video into element — with retry
+  async playLocalWhenReady(getEl: () => HTMLElement | null, retries = 30): Promise<void> {
+    for (let i = 0; i < retries; i++) {
+      const el = getEl();
+      if (el && el.clientWidth > 0 && this.localVideoTrack) {
+        this.localVideoTrack.play(el);
+        console.log('[RTC] Local video playing');
+        return;
+      }
+      await new Promise(r => setTimeout(r, 200));
+    }
+    // Last resort — play anyway even if size unknown
+    const el = getEl();
+    if (el && this.localVideoTrack) { this.localVideoTrack.play(el); }
+  }
+
+  // Play remote video into element — with retry
+  async playRemoteWhenReady(uid: any, getEl: () => HTMLElement | null, retries = 30): Promise<void> {
+    for (let i = 0; i < retries; i++) {
+      const el = getEl();
+      const entry = this.remoteUsers.get(uid);
+      if (el && el.clientWidth > 0 && entry?.video) {
+        entry.video.play(el);
+        console.log('[RTC] Remote video playing for uid:', uid);
+        return;
+      }
+      await new Promise(r => setTimeout(r, 200));
+    }
+    const el = getEl();
+    const entry = this.remoteUsers.get(uid);
+    if (el && entry?.video) { entry.video.play(el); }
   }
 
   playLocal(el: HTMLElement): void {

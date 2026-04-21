@@ -237,15 +237,9 @@ export class VkycApplicant {
     }
   }
 
-  // Retry playing video into element until it appears in DOM
-  private async playWhenReady(elementId: string, playFn: (el: HTMLElement) => void, retries = 20) {
-    for (let i = 0; i < retries; i++) {
-      const root = this.el.shadowRoot || this.el;
-      const el = root.querySelector('#' + elementId) as HTMLElement|null;
-      if (el) { playFn(el); return; }
-      await new Promise(r => setTimeout(r, 150));
-    }
-    console.warn('Could not find element:', elementId);
+  private getEl(id: string): HTMLElement | null {
+    const root = this.el.shadowRoot || this.el;
+    return root.querySelector('#' + id) as HTMLElement | null;
   }
 
   private async startAgoraCall() {
@@ -254,32 +248,9 @@ export class VkycApplicant {
     const tim = setInterval(()=>{t++;this.sessionSecs=t;},1000);
     (this as any)._sessionTimer = tim;
 
-    try {
-      this.call = new VkycCall();
-
-      this.call.onRemoteJoined = (uid, videoTrack) => {
-        this.remoteUid = uid;
-        if (videoTrack) {
-          this.playWhenReady('agora-agent', (el) => videoTrack.play(el));
-        }
-      };
-      this.call.onRemoteLeft = () => {
-        this.remoteUid = null;
-      };
-      this.call.onError = (msg) => {
-        this.callError = msg;
-      };
-
-      // The step='session' is already set — DOM is rendered
-      // Join channel (applicant UID = 1)
-      await this.call.join(this.caseId, 1);
-
-      // Play own video — wait for #agora-self to appear
-      this.playWhenReady('agora-self', (el) => this.call!.playLocal(el));
-
-      // Listen for agent commands — always create fresh signal for listening
-      this.signal = new VkycSignal();
-      this.signal.onAgentMessage = (data: any) => {
+    // Start agent command listener BEFORE joining (so we don't miss early commands)
+    this.signal = new VkycSignal();
+    this.signal.onAgentMessage = (data: any) => {
         console.log('[Applicant] Agent command:', data);
         if (data.type === 'agent-info') {
           this.agentName = data.agentName || 'KYC Agent';
@@ -309,6 +280,31 @@ export class VkycApplicant {
       };
       this.signal.listenForAgent();
 
+      try {
+        this.call = new VkycCall();
+
+        this.call.onRemoteJoined = (uid, videoTrack) => {
+          this.remoteUid = uid;
+          if (videoTrack) {
+            this.call!.playRemoteWhenReady(uid, () => this.getEl('agora-agent'));
+          }
+        };
+        this.call.onRemoteLeft = () => { this.remoteUid = null; };
+        this.call.onError = (msg) => { this.callError = msg; };
+
+        // Small delay to let DOM render session view
+        await new Promise(r => setTimeout(r, 300));
+
+        // Join channel (applicant UID = 1)
+        await this.call.join(this.caseId, 1);
+
+        // Play own video with dimension check
+        this.call.playLocalWhenReady(() => this.getEl('agora-self'));
+
+      } catch (e: any) {
+        this.callError = e.message;
+        console.error('[Applicant] Agora join failed:', e);
+      }
     } catch (e: any) {
       this.callError = e.message;
     }

@@ -90,15 +90,9 @@ export class VkycAgent {
     setTimeout(()=>{ this.toasts=this.toasts.filter(t=>t.id!==id); },4000);
   }
 
-  // Retry playing video into element until it appears in DOM (max 20 tries)
-  private async playWhenReady(elementId: string, playFn: (el: HTMLElement) => void, retries = 20) {
-    for (let i = 0; i < retries; i++) {
-      const root = this.el.shadowRoot || this.el;
-      const el = root.querySelector('#' + elementId) as HTMLElement|null;
-      if (el) { playFn(el); return; }
-      await new Promise(r => setTimeout(r, 150));
-    }
-    console.warn('Could not find element:', elementId);
+  private getEl(id: string): HTMLElement | null {
+    const root = this.el.shadowRoot || this.el;
+    return root.querySelector('#' + id) as HTMLElement | null;
   }
 
   private async startAgoraCall() {
@@ -110,7 +104,8 @@ export class VkycAgent {
       this.call.onRemoteJoined = (uid, videoTrack) => {
         this.remoteUid = uid;
         if (videoTrack) {
-          this.playWhenReady('agora-remote', (el) => videoTrack.play(el));
+          // Retry playing remote video until container has dimensions
+          this.call!.playRemoteWhenReady(uid, () => this.getEl('agora-remote'));
         }
         this.pushToast('Customer video connected','success');
       };
@@ -124,14 +119,18 @@ export class VkycAgent {
       this.sessionState = 'live';
       this.timerRef = setInterval(()=>{ this.callTimer=this.callTimer+1; },1000);
 
+      // Small delay to let Stencil re-render with session view
+      await new Promise(r => setTimeout(r, 300));
+
       // Join channel
       await this.call.join(c.id, agentUid);
 
-      // Play local video — wait for #agora-local to appear in DOM
-      this.playWhenReady('agora-local', (el) => this.call!.playLocal(el));
+      // Play local video with dimension check
+      this.call.playLocalWhenReady(() => this.getEl('agora-local'));
 
       this.pushToast(`Connected to ${c.name}`,'info');
-      // Send agent info to applicant so their UI shows correct name
+
+      // Send agent info to applicant
       if (this.signal) {
         this.signal.sendToApplicant({
           type: 'agent-info',
