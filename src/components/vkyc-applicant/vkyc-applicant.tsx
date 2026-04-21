@@ -252,13 +252,21 @@ export class VkycApplicant {
     return root.querySelector('#' + id) as HTMLElement | null;
   }
 
+  private async waitForEl(id: string, retries = 40): Promise<HTMLElement | null> {
+    for (let i = 0; i < retries; i++) {
+      const el = this.getEl(id);
+      if (el) return el;
+      await new Promise(r => setTimeout(r, 100));
+    }
+    return null;
+  }
+
   private async startAgoraCall() {
-    // Start session timer
     let t = 0;
     const tim = setInterval(()=>{ t++; this.sessionSecs = t; }, 1000);
     (this as any)._sessionTimer = tim;
 
-    // Start agent command listener BEFORE joining so no messages are missed
+    // Start signal listener BEFORE joining
     this.signal = new VkycSignal();
     this.signal.onAgentMessage = (data: any) => {
       console.log('[Applicant] Agent command:', data);
@@ -271,9 +279,8 @@ export class VkycApplicant {
         this.sessionSubStep = 'code';
       }
       if (data.type === 'flip-camera') {
-        // Switch between front and rear camera
         if (this.call) {
-          this.call.switchCamera(this.getEl('agora-self')).catch(e => console.warn('[Applicant] Camera switch failed:', e));
+          this.call.switchCamera().catch(e => console.warn('[Applicant] Camera switch failed:', e));
         }
       }
     };
@@ -282,21 +289,23 @@ export class VkycApplicant {
     try {
       this.call = new VkycCall();
 
-      this.call.onRemoteJoined = (uid, videoTrack) => {
+      this.call.onRemoteJoined = async (uid) => {
         this.remoteUid = uid;
-        if (videoTrack) {
-          this.call!.playRemoteWhenReady(uid, () => this.getEl('agora-agent'));
-        }
+        const el = await this.waitForEl('agora-agent');
+        if (el) this.call!.playRemote(uid, el);
       };
       this.call.onRemoteLeft = () => { this.remoteUid = null; };
       this.call.onError = (msg) => { this.callError = msg; };
 
-      // Wait for DOM to render session layout before Agora opens camera
-      await new Promise(r => setTimeout(r, 300));
+      // Wait for session DOM to render before joining
+      const selfEl  = await this.waitForEl('agora-self');
+      const agentEl = await this.waitForEl('agora-agent');
+      console.log('[Applicant] Video containers found:', !!selfEl, !!agentEl);
 
       await this.call.join(this.caseId, 1);
 
-      this.call.playLocalWhenReady(() => this.getEl('agora-self'));
+      // Play local after join
+      if (selfEl) this.call.playLocal(selfEl);
 
     } catch (e: any) {
       this.callError = e.message;

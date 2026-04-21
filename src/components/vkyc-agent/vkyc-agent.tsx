@@ -95,19 +95,26 @@ export class VkycAgent {
     return root.querySelector('#' + id) as HTMLElement | null;
   }
 
+  private async waitForEl(id: string, retries = 40): Promise<HTMLElement | null> {
+    for (let i = 0; i < retries; i++) {
+      const el = this.getEl(id);
+      if (el) return el;
+      await new Promise(r => setTimeout(r, 100));
+    }
+    return null;
+  }
+
   private async startAgoraCall() {
     const c = this.activeCase!;
     try {
       this.call = new VkycCall();
       const agentUid = 1000 + Math.floor(Math.random() * 1000);
 
-      this.call.onRemoteJoined = (uid, videoTrack) => {
+      this.call.onRemoteJoined = async (uid) => {
         this.remoteUid = uid;
-        if (videoTrack) {
-          // Retry playing remote video until container has dimensions
-          this.call!.playRemoteWhenReady(uid, () => this.getEl('agora-remote'));
-        }
         this.pushToast('Customer video connected','success');
+        const el = await this.waitForEl('agora-remote');
+        if (el) this.call!.playRemote(uid, el);
       };
       this.call.onRemoteLeft = () => {
         this.remoteUid = null;
@@ -115,28 +122,24 @@ export class VkycAgent {
       };
       this.call.onError = (msg) => this.pushToast(msg,'error');
 
-      // Set live FIRST so DOM renders the video containers
+      // Set live FIRST — triggers Stencil to render session view with video containers
       this.sessionState = 'live';
       this.timerRef = setInterval(()=>{ this.callTimer=this.callTimer+1; },1000);
 
-      // Small delay to let Stencil re-render with session view
-      await new Promise(r => setTimeout(r, 300));
+      // Wait for video containers to appear in DOM
+      const localEl  = await this.waitForEl('agora-local');
+      const remoteEl = await this.waitForEl('agora-remote');
+      console.log('[Agent] Video containers found:', !!localEl, !!remoteEl);
 
       // Join channel
       await this.call.join(c.id, agentUid);
 
-      // Play local video with dimension check
-      this.call.playLocalWhenReady(() => this.getEl('agora-local'));
+      // Play local immediately after join
+      if (localEl) this.call.playLocal(localEl);
 
       this.pushToast(`Connected to ${c.name}`,'info');
-
-      // Send agent info to applicant
       if (this.signal) {
-        this.signal.sendToApplicant({
-          type: 'agent-info',
-          agentName: 'Agent Kumar',
-          agentId: 'AGT001'
-        });
+        this.signal.sendToApplicant({ type:'agent-info', agentName:'Agent Kumar', agentId:'AGT001' });
       }
     } catch (e: any) {
       this.pushToast('Camera/mic error: ' + e.message,'error');
