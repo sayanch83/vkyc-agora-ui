@@ -244,72 +244,63 @@ export class VkycApplicant {
 
   private async startAgoraCall() {
     // Start session timer
-    let t=0;
-    const tim = setInterval(()=>{t++;this.sessionSecs=t;},1000);
+    let t = 0;
+    const tim = setInterval(()=>{ t++; this.sessionSecs = t; }, 1000);
     (this as any)._sessionTimer = tim;
 
-    // Start agent command listener BEFORE joining (so we don't miss early commands)
+    // Start agent command listener BEFORE joining so no messages are missed
     this.signal = new VkycSignal();
     this.signal.onAgentMessage = (data: any) => {
-        console.log('[Applicant] Agent command:', data);
-        if (data.type === 'agent-info') {
-          this.agentName = data.agentName || 'KYC Agent';
-          this.agentId   = data.agentId   || 'AGT001';
+      console.log('[Applicant] Agent command:', data);
+      if (data.type === 'agent-info') {
+        this.agentName = data.agentName || 'KYC Agent';
+        this.agentId   = data.agentId   || 'AGT001';
+      }
+      if (data.type === 'show-code') {
+        this.receivedCode = data.code;
+        this.sessionSubStep = 'code';
+      }
+      if (data.type === 'flip-camera') {
+        this.cameraFlipped = !this.cameraFlipped;
+        const root = this.el.shadowRoot || this.el;
+        const container = root.querySelector('#agora-self');
+        if (container) {
+          const vids = container.querySelectorAll('video');
+          vids.forEach((vid: HTMLVideoElement) => {
+            vid.style.transform = this.cameraFlipped ? 'scaleX(1)' : 'scaleX(-1)';
+            vid.style.transition = 'transform 0.3s ease';
+          });
+          (container as HTMLElement).style.transform = this.cameraFlipped ? 'scaleX(1)' : 'scaleX(-1)';
+          (container as HTMLElement).style.transition = 'transform 0.3s ease';
         }
-        if (data.type === 'show-code') {
-          this.receivedCode = data.code;
-          this.sessionSubStep = 'code';
-        }
-        if (data.type === 'flip-camera') {
-          this.cameraFlipped = !this.cameraFlipped;
-          // Find all videos in the self panel and flip
-          const root = this.el.shadowRoot || this.el;
-          const container = root.querySelector('#agora-self');
-          if (container) {
-            const vids = container.querySelectorAll('video');
-            vids.forEach((vid: HTMLVideoElement) => {
-              vid.style.transform = this.cameraFlipped ? 'scaleX(1)' : 'scaleX(-1)';
-              vid.style.transition = 'transform 0.3s ease';
-            });
-            // Also try the container itself
-            (container as HTMLElement).style.transform = this.cameraFlipped ? 'scaleX(1)' : 'scaleX(-1)';
-            (container as HTMLElement).style.transition = 'transform 0.3s ease';
-          }
-          console.log('[Applicant] Camera flipped:', this.cameraFlipped);
+      }
+    };
+    this.signal.listenForAgent();
+
+    try {
+      this.call = new VkycCall();
+
+      this.call.onRemoteJoined = (uid, videoTrack) => {
+        this.remoteUid = uid;
+        if (videoTrack) {
+          this.call!.playRemoteWhenReady(uid, () => this.getEl('agora-agent'));
         }
       };
-      this.signal.listenForAgent();
+      this.call.onRemoteLeft = () => { this.remoteUid = null; };
+      this.call.onError = (msg) => { this.callError = msg; };
 
-      try {
-        this.call = new VkycCall();
+      // Wait for DOM to render session layout before Agora opens camera
+      await new Promise(r => setTimeout(r, 300));
 
-        this.call.onRemoteJoined = (uid, videoTrack) => {
-          this.remoteUid = uid;
-          if (videoTrack) {
-            this.call!.playRemoteWhenReady(uid, () => this.getEl('agora-agent'));
-          }
-        };
-        this.call.onRemoteLeft = () => { this.remoteUid = null; };
-        this.call.onError = (msg) => { this.callError = msg; };
+      await this.call.join(this.caseId, 1);
 
-        // Small delay to let DOM render session view
-        await new Promise(r => setTimeout(r, 300));
+      this.call.playLocalWhenReady(() => this.getEl('agora-self'));
 
-        // Join channel (applicant UID = 1)
-        await this.call.join(this.caseId, 1);
-
-        // Play own video with dimension check
-        this.call.playLocalWhenReady(() => this.getEl('agora-self'));
-
-      } catch (e: any) {
-        this.callError = e.message;
-        console.error('[Applicant] Agora join failed:', e);
-      }
     } catch (e: any) {
       this.callError = e.message;
+      console.error('[Applicant] Agora join failed:', e);
     }
   }
-
 
 
   private visibleSteps() { return APPLICANT_STEPS.filter(s=>s.id!=='aadhaar'); }
