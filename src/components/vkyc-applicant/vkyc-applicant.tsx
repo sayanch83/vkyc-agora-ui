@@ -220,7 +220,7 @@ export class VkycApplicant {
     (this as any)._sessionTimer = tim;
   }
 
-  // Keep simulate for fallback / testing
+
   private simulate() {
     let t=0; const tim=setInterval(()=>{t++;this.sessionSecs=t;},1000);
     setTimeout(()=>{this.sessionSubStep='code';},6000);

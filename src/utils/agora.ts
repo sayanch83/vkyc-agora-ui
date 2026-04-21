@@ -51,7 +51,7 @@ export class VkycCall {
       if (!this.remoteUsers.has(user.uid)) {
         this.remoteUsers.set(user.uid, { video: null, audio: null });
       }
-      const entry = this.remoteUsers.get(user.uid);
+      const entry = this.remoteUsers.get(user.uid)!;
       if (mediaType === 'video') {
         entry.video = user.videoTrack;
       }
