@@ -432,12 +432,12 @@ export class VkycAgent {
                 : <span class="sb-tag sb-tag--amber">eKYC Valid</span>}
             </div>
             <div class="sb-assigned">Officer: Agent Kumar · AGT001</div>
-          {this.applicantDevice&&(
-            <div class="sb-device">
-              <span class="sb-device-icon">{this.applicantDevice.deviceType==='Mobile'?'📱':this.applicantDevice.deviceType==='Tablet'?'🖥️':'💻'}</span>
-              <span class="sb-device-info">{this.applicantDevice.os} · {this.applicantDevice.browser} · {this.applicantDevice.screen}</span>
-            </div>
-          )}
+            {this.applicantDevice&&(
+              <div class="sb-device">
+                <span class="sb-device-icon">{this.applicantDevice.deviceType==='Mobile'?'📱':this.applicantDevice.deviceType==='Tablet'?'🖥️':'💻'}</span>
+                <span class="sb-device-info">{this.applicantDevice.os} · {this.applicantDevice.browser} · {this.applicantDevice.screen}</span>
+              </div>
+            )}
           </div>
 
           {/* Session status */}
