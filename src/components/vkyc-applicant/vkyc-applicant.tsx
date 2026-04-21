@@ -277,8 +277,8 @@ export class VkycApplicant {
       // Play own video — wait for #agora-self to appear
       this.playWhenReady('agora-self', (el) => this.call!.playLocal(el));
 
-      // Listen for agent commands (name, code, flip)
-      if (!this.signal) this.signal = new VkycSignal();
+      // Listen for agent commands — always create fresh signal for listening
+      this.signal = new VkycSignal();
       this.signal.onAgentMessage = (data: any) => {
         console.log('[Applicant] Agent command:', data);
         if (data.type === 'agent-info') {
@@ -291,12 +291,20 @@ export class VkycApplicant {
         }
         if (data.type === 'flip-camera') {
           this.cameraFlipped = !this.cameraFlipped;
-          // Flip the video element via CSS
+          // Find all videos in the self panel and flip
           const root = this.el.shadowRoot || this.el;
-          const vid = root.querySelector('#agora-self video') as HTMLVideoElement;
-          if (vid) {
-            vid.style.transform = this.cameraFlipped ? 'scaleX(1)' : 'scaleX(-1)';
+          const container = root.querySelector('#agora-self');
+          if (container) {
+            const vids = container.querySelectorAll('video');
+            vids.forEach((vid: HTMLVideoElement) => {
+              vid.style.transform = this.cameraFlipped ? 'scaleX(1)' : 'scaleX(-1)';
+              vid.style.transition = 'transform 0.3s ease';
+            });
+            // Also try the container itself
+            (container as HTMLElement).style.transform = this.cameraFlipped ? 'scaleX(1)' : 'scaleX(-1)';
+            (container as HTMLElement).style.transition = 'transform 0.3s ease';
           }
+          console.log('[Applicant] Camera flipped:', this.cameraFlipped);
         }
       };
       this.signal.listenForAgent();
@@ -668,25 +676,20 @@ export class VkycApplicant {
             )}
           </div>
 
-          {/* Step info bar — only show for non-face steps */}
-          {!this.agentDone&&this.sessionSubStep!=='face'&&(
+          {/* Received code — show whenever agent sends it, regardless of subStep */}
+          {this.receivedCode&&!this.agentDone&&(
+            <div class="session-step-bar session-step-bar--code">
+              <div class="ssb-label">🎤 Say each character aloud to the officer:</div>
+              <div class="ssb-code-row">
+                {this.receivedCode.split('').map(ch=><div class="ssb-char">{ch}</div>)}
+              </div>
+            </div>
+          )}
+          {!this.receivedCode&&!this.agentDone&&this.sessionSubStep!=='face'&&(
             <div class="session-step-bar">
               <div class="ssb-label">{stepLabel[this.sessionSubStep]}</div>
-              {this.sessionSubStep==='code'&&this.receivedCode&&(
-                <div class="ssb-code-row">
-                  <div class="ssb-code-label">Say each character aloud:</div>
-                  {this.receivedCode.split('').map(ch=><div class="ssb-char">{ch}</div>)}
-                </div>
-              )}
-              {this.sessionSubStep==='code'&&!this.receivedCode&&(
-                <div class="ssb-code-waiting">⏳ Officer is generating a code for you…</div>
-              )}
-              {this.codeConfirmed&&this.sessionSubStep!=='face'&&(
-                <div class="ssb-check">✓ Code confirmed</div>
-              )}
-              {this.panCaptured&&this.sessionSubStep==='waiting'&&(
-                <div class="ssb-check">✓ PAN verified</div>
-              )}
+              {this.codeConfirmed&&<div class="ssb-check">✓ Code confirmed</div>}
+              {this.panCaptured&&this.sessionSubStep==='waiting'&&<div class="ssb-check">✓ PAN verified</div>}
             </div>
           )}
 

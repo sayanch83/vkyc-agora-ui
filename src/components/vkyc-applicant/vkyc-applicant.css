@@ -223,7 +223,7 @@
 
 /* Session fullscreen */
 .session-fullscreen { display: flex; width: 100%; height: calc(100vh - 67px); background: #111827; }
-.session-half { flex: 1; position: relative; overflow: hidden; display: flex; flex-direction: column; }
+.session-half { flex: 1; position: relative; overflow: hidden; display: flex; flex-direction: column; min-height: 0; height: 100%; }
 .session-half--right { display: flex; flex-direction: column; }
 .session-half--left { border-right: 1px solid rgba(255,255,255,0.08); }
 .session-half-inner { flex: 1; display: flex; align-items: center; justify-content: center; }
@@ -243,7 +243,7 @@
 .session-time { font-size: 12px; color: rgba(255,255,255,0.65); font-weight: 600; font-variant-numeric: tabular-nums; }
 
 /* Step bar — flows naturally in flex column, no absolute */
-.session-step-bar { background: rgba(26,47,94,0.92); backdrop-filter: blur(6px); padding: 10px 18px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; border-top: 1px solid rgba(211,140,27,0.3); flex-shrink: 0; position: relative; z-index: 10; }
+.session-step-bar { background: rgba(26,47,94,0.95); backdrop-filter: blur(6px); padding: 10px 18px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; border-top: 1px solid rgba(211,140,27,0.3); position: absolute; bottom: 60px; left: 0; right: 0; z-index: 10; }
 .ssb-label { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.85); flex: 1; }
 .ssb-code-row { display: flex; gap: 4px; }
 .ssb-char { width: 30px; height: 36px; border-radius: 6px; background: rgba(211,140,27,0.2); border: 1.5px solid rgba(211,140,27,0.5); display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 900; color: #FFAA00; font-family: monospace; }
@@ -252,10 +252,10 @@
 /* Applicant session controls — mic/cam/disconnect, no overlap */
 .session-applicant-controls {
   display: flex; justify-content: center; gap: 10px;
-  padding: 9px 16px; background: rgba(0,0,0,0.75);
+  padding: 9px 16px; background: rgba(0,0,0,0.80);
   border-top: 1px solid rgba(255,255,255,0.1);
-  flex-shrink: 0;
-  position: relative; z-index: 10;
+  position: absolute; bottom: 0; left: 0; right: 0;
+  z-index: 10;
 }
 .appl-ctrl {
   display: flex; flex-direction: column; align-items: center; gap: 3px;
@@ -456,22 +456,27 @@
   display: block;
 }
 .agora-video-box--fullhalf {
-  flex: 1;
-  width: 100%;
-  min-height: 0;
-  z-index: 2;
-  position: relative;
-}
-/* Agora injects a <div> wrapper then <video> inside — both must fill */
-.agora-video-box > div {
+  position: absolute !important;
+  top: 0; left: 0;
   width: 100% !important;
   height: 100% !important;
+  z-index: 2;
+}
+/* Agora injects a <div> wrapper then <video> inside — both must fill */
+.agora-video-box > div,
+.agora-video-box > div > div {
+  width: 100% !important;
+  height: 100% !important;
+  position: absolute !important;
+  inset: 0 !important;
 }
 .agora-video-box video {
   width: 100% !important;
   height: 100% !important;
   object-fit: cover !important;
   display: block !important;
+  position: absolute !important;
+  inset: 0 !important;
 }
 
 /* ── Live camera preview during liveness check ───────────── */
@@ -523,4 +528,11 @@
 .ssb-code-waiting {
   font-size: 13px; color: rgba(255,255,255,0.5);
   font-style: italic; text-align: center; padding: 8px 0;
+}
+
+/* ── Code step bar highlight ─────────────────────────────── */
+.session-step-bar--code {
+  background: rgba(26,47,94,0.97) !important;
+  border-top: 2px solid #D38C1B !important;
+  padding: 12px 18px !important;
 }

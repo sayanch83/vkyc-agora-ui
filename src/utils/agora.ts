@@ -122,18 +122,24 @@ export class VkycSignal {
       };
     } catch(e) {}
 
-    // Poll API for cross-device
+    // Poll API every 1.5s for new agent commands using queue pattern
+    let lastCmdId = 0;
     setInterval(async () => {
       try {
-        const res = await fetch(API_BASE() + '/agent-signal');
+        const res = await fetch(API_BASE() + '/agent-signal?after=' + lastCmdId);
         if (!res.ok) return;
         const data = await res.json();
-        if (data?.type && data.type !== 'none') {
-          this.onAgentMessage(data);
-          await fetch(API_BASE() + '/agent-signal', { method: 'DELETE' });
+        if (data?.commands?.length) {
+          for (const cmd of data.commands) {
+            if (cmd.id > lastCmdId) {
+              lastCmdId = cmd.id;
+              console.log('[Signal] Agent command from API:', cmd);
+              this.onAgentMessage(cmd);
+            }
+          }
         }
       } catch(e) {}
-    }, 1000);
+    }, 1500);
   }
 
   stop(): void {
