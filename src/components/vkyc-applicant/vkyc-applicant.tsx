@@ -56,7 +56,6 @@ export class VkycApplicant {
   @State() agentName = 'KYC Agent';
   @State() agentId = 'AGT001';
   @State() receivedCode: string|null = null;
-  @State() cameraFlipped = false;
 
   private _cachedSlots: Array<{date:string;label:string;slots:Array<{time:string;available:boolean}>}>|null = null;
   private generateSlots(): Array<{date:string;label:string;slots:Array<{time:string;available:boolean}>}> {
@@ -172,18 +171,29 @@ export class VkycApplicant {
     // Open camera immediately so applicant sees themselves
     try {
       this.livenessStream = await navigator.mediaDevices.getUserMedia({ video:true, audio:false });
-      // Attach stream — retry until element appears (Stencil renders async)
+      // Attach stream — retry until element appears in DOM
       const attachCam = async () => {
-        for (let i = 0; i < 20; i++) {
+        for (let i = 0; i < 40; i++) {
           const root = this.el.shadowRoot || this.el;
           const vid = root.querySelector('#liveness-cam') as HTMLVideoElement;
           if (vid) {
             vid.srcObject = this.livenessStream;
-            try { await vid.play(); } catch {}
+            vid.setAttribute('autoplay', '');
+            vid.setAttribute('playsinline', '');
+            vid.muted = true;
+            try {
+              await vid.play();
+              console.log('[Liveness] Camera attached to video element');
+            } catch(e) {
+              console.warn('[Liveness] Play failed, retrying:', e);
+              await new Promise(r => setTimeout(r, 200));
+              try { await vid.play(); } catch {}
+            }
             return;
           }
-          await new Promise(r => setTimeout(r, 150));
+          await new Promise(r => setTimeout(r, 100));
         }
+        console.warn('[Liveness] Could not find #liveness-cam after 40 retries');
       };
       attachCam();
     } catch(e) {
@@ -261,17 +271,9 @@ export class VkycApplicant {
         this.sessionSubStep = 'code';
       }
       if (data.type === 'flip-camera') {
-        this.cameraFlipped = !this.cameraFlipped;
-        const root = this.el.shadowRoot || this.el;
-        const container = root.querySelector('#agora-self');
-        if (container) {
-          const vids = container.querySelectorAll('video');
-          vids.forEach((vid: HTMLVideoElement) => {
-            vid.style.transform = this.cameraFlipped ? 'scaleX(1)' : 'scaleX(-1)';
-            vid.style.transition = 'transform 0.3s ease';
-          });
-          (container as HTMLElement).style.transform = this.cameraFlipped ? 'scaleX(1)' : 'scaleX(-1)';
-          (container as HTMLElement).style.transition = 'transform 0.3s ease';
+        // Switch between front and rear camera
+        if (this.call) {
+          this.call.switchCamera().catch(e => console.warn('[Applicant] Camera switch failed:', e));
         }
       }
     };
