@@ -643,8 +643,8 @@
 .sb-device {
   display: flex; align-items: center; gap: 5px;
   padding: 4px 8px; margin-top: 4px;
-  background: rgba(255,255,255,0.06);
-  border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);
+  background: #f0f4ff;
+  border-radius: 6px; border: 1px solid #dde3f5;
 }
-.sb-device-icon { font-size: 13px; }
-.sb-device-info { font-size: 10px; color: rgba(255,255,255,0.55); font-weight: 500; }
+.sb-device-icon { font-size: 12px; }
+.sb-device-info { font-size: 10px; color: #374151; font-weight: 500; line-height: 1.4; }
