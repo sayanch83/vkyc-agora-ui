@@ -224,6 +224,7 @@
 /* Session fullscreen */
 .session-fullscreen { display: flex; width: 100%; height: calc(100vh - 67px); background: #111827; }
 .session-half { flex: 1; position: relative; overflow: hidden; display: flex; flex-direction: column; }
+.session-half--right { display: flex; flex-direction: column; }
 .session-half--left { border-right: 1px solid rgba(255,255,255,0.08); }
 .session-half-inner { flex: 1; display: flex; align-items: center; justify-content: center; }
 .session-name-tag { position: absolute; top: 10px; left: 10px; z-index: 10; background: rgba(26,47,94,0.9); color: #fff; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; }
@@ -242,7 +243,7 @@
 .session-time { font-size: 12px; color: rgba(255,255,255,0.65); font-weight: 600; font-variant-numeric: tabular-nums; }
 
 /* Step bar — flows naturally in flex column, no absolute */
-.session-step-bar { background: rgba(26,47,94,0.92); backdrop-filter: blur(6px); padding: 10px 18px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; border-top: 1px solid rgba(211,140,27,0.3); flex-shrink: 0; }
+.session-step-bar { background: rgba(26,47,94,0.92); backdrop-filter: blur(6px); padding: 10px 18px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; border-top: 1px solid rgba(211,140,27,0.3); flex-shrink: 0; position: relative; z-index: 10; }
 .ssb-label { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.85); flex: 1; }
 .ssb-code-row { display: flex; gap: 4px; }
 .ssb-char { width: 30px; height: 36px; border-radius: 6px; background: rgba(211,140,27,0.2); border: 1.5px solid rgba(211,140,27,0.5); display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 900; color: #FFAA00; font-family: monospace; }
@@ -251,9 +252,10 @@
 /* Applicant session controls — mic/cam/disconnect, no overlap */
 .session-applicant-controls {
   display: flex; justify-content: center; gap: 10px;
-  padding: 9px 16px; background: rgba(0,0,0,0.65);
+  padding: 9px 16px; background: rgba(0,0,0,0.75);
   border-top: 1px solid rgba(255,255,255,0.1);
   flex-shrink: 0;
+  position: relative; z-index: 10;
 }
 .appl-ctrl {
   display: flex; flex-direction: column; align-items: center; gap: 3px;
@@ -451,16 +453,23 @@
 .agora-video-box {
   background: #0a121f;
   overflow: hidden;
+  display: block;
 }
 .agora-video-box--fullhalf {
-  position: absolute;
-  inset: 0;
+  flex: 1;
   width: 100%;
-  height: 100%;
+  min-height: 0;
+  z-index: 2;
+  position: relative;
 }
-/* Agora injects a <video> tag — make it fill the container */
+/* Agora injects a <div> wrapper then <video> inside — both must fill */
+.agora-video-box > div {
+  width: 100% !important;
+  height: 100% !important;
+}
 .agora-video-box video {
   width: 100% !important;
   height: 100% !important;
   object-fit: cover !important;
+  display: block !important;
 }

@@ -206,20 +206,35 @@ export class VkycAgent {
 
   // Capture a frame from the live Agora remote video stream
   private captureVideoFrame(): string|null {
-    // The Agora SDK injects a <video> element inside #agora-remote
-    const container = this.el.shadowRoot?.querySelector('#agora-remote');
-    if (!container) { this.pushToast('No video stream found','error'); return null; }
-    const video = container.querySelector('video') as HTMLVideoElement;
-    if (!video || video.readyState < 2) { this.pushToast('Video not ready — try again','error'); return null; }
+    // Search both shadow root and document for the agora-remote container
+    const root = this.el.shadowRoot || this.el;
+    const container = root.querySelector('#agora-remote');
+    if (!container) { this.pushToast('No video stream — ensure customer is connected','error'); return null; }
 
-    // Draw current frame to canvas and export as PNG
+    // Agora may inject video inside nested divs
+    const video = container.querySelector('video') as HTMLVideoElement;
+    if (!video) { this.pushToast('Video element not found — try again','error'); return null; }
+
+    // If not ready yet, capture whatever is available (readyState 1+ means metadata loaded)
+    if (video.readyState < 1) { this.pushToast('Video not ready — wait a moment and try again','error'); return null; }
+
+    const w = video.videoWidth  || video.clientWidth  || 640;
+    const h = video.videoHeight || video.clientHeight || 480;
+
     const canvas = document.createElement('canvas');
-    canvas.width  = video.videoWidth  || 640;
-    canvas.height = video.videoHeight || 480;
+    canvas.width  = w;
+    canvas.height = h;
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL('image/png');
+    ctx.drawImage(video, 0, 0, w, h);
+
+    const data = canvas.toDataURL('image/png');
+    // Verify it's not a blank frame (all black = very small data URL)
+    if (data.length < 5000) {
+      this.pushToast('Frame appears blank — ensure customer video is visible','error');
+      return null;
+    }
+    return data;
   }
 
   private captureID(side:'front'|'back') {

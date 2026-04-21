@@ -569,8 +569,7 @@ export class VkycApplicant {
         {/* Right — Customer feed (Agora local) */}
         <div class="session-half session-half--right">
           <div class="session-name-tag session-name-tag--right">You</div>
-          <div id="agora-self" class="agora-video-box agora-video-box--fullhalf"/>
-          <div class="session-half-inner" style={{position:'absolute',inset:'0',pointerEvents:'none'}}>
+          <div id="agora-self" class="agora-video-box agora-video-box--fullhalf">
             {this.agentDone&&(
               <div class="session-done-overlay">
                 <div class="session-done-icon">✓</div>

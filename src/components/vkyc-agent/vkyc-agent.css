@@ -582,27 +582,45 @@
   background: #0a121f;
   overflow: hidden;
   position: relative;
+  display: block;
 }
 .agora-video-box--remote {
-  width: 100%; height: 100%;
-  /* Fills the vid-cust container */
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
 }
 .agora-video-box--local {
-  width: 100%; height: 100%;
+  width: 100%;
+  height: 100%;
+  min-height: 80px;
 }
-/* Agora injects a <video> tag — make it fill the container */
+/* Agora injects a <div> wrapper then a <video> inside — make both fill */
+.agora-video-box > div {
+  width: 100% !important;
+  height: 100% !important;
+}
 .agora-video-box video {
   width: 100% !important;
   height: 100% !important;
   object-fit: cover !important;
+  display: block !important;
 }
 .vid-cust {
   position: relative;
   overflow: hidden;
+  min-height: 160px;
 }
 .vid-waiting {
   position: absolute; inset: 0;
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
   gap: 6px; z-index: 1;
+  pointer-events: none;
+}
+.vid-agent {
+  position: relative;
+  overflow: hidden;
+  min-height: 80px;
 }
