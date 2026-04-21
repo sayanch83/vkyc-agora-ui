@@ -64,10 +64,9 @@ export class VkycAgent {
   private async connectSignal() {
     try {
       this.signal = new VkycSignal();
-      // Use timestamp to avoid UID conflicts if agent opens multiple tabs
-      await this.signal.connect('agent-' + Date.now());
       this.signal.onMessage = (data: any) => {
         if (data.type === 'applicant-ready') {
+          console.log('[Agent] Received applicant-ready signal:', data);
           const matched = this.cases.find(c => c.id === data.caseId) || this.cases[0];
           this.pendingApplicant = { name: data.name, caseId: matched.id };
           this.activeCase = matched;
@@ -75,11 +74,11 @@ export class VkycAgent {
           this.showAdmitModal = true;
         }
       };
-      console.log('[VKYC Agent] RTM connected and listening for applicants on channel: vkyc-signal');
-      this.pushToast('Listening for applicants…','info');
+      this.signal.startListening();
+      console.log('[Agent] Signal listener started');
+      this.pushToast('Ready — waiting for applicant…','info');
     } catch(e) {
-      console.error('[VKYC Agent] RTM FAILED:', e);
-      this.pushToast('Signal connection failed: ' + (e as any).message,'error');
+      console.error('[Agent] Signal failed:', e);
     }
   }
 
@@ -141,6 +140,7 @@ export class VkycAgent {
 
   private endSession() {
     if(this.call){this.call.leave();this.call=null;}
+    if(this.signal){this.signal.stop();this.signal=null;}
     this.pendingApplicant=null;
     this.remoteUid=null;
     clearInterval(this.timerRef);

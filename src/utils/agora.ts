@@ -1,79 +1,105 @@
 // src/utils/agora.ts
-// Agora Web SDK 4.x (RTC) + RTM SDK for signalling
-// RTC = video/audio call
-// RTM = messaging to signal "applicant is ready"
+// Agora RTC for video/audio
+// Signalling via BroadcastChannel (same device) + API long-poll (cross device)
 
 const APP_ID = '15d6681ab3b049ad91ecc585cc645551';
-const RTM_CHANNEL = 'vkyc-signal'; // shared signalling channel
 
 let _AgoraRTC: any = null;
-let _AgoraRTM: any = null;
-
-async function loadScript(src: string, attr: string): Promise<void> {
-  if (document.querySelector(`script[${attr}]`)) return;
-  return new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = src;
-    s.setAttribute(attr, '1');
-    s.onload = () => resolve();
-    s.onerror = () => reject(new Error('Failed to load: ' + src));
-    document.head.appendChild(s);
-  });
-}
 
 async function getAgoraRTC(): Promise<any> {
   if (_AgoraRTC) return _AgoraRTC;
-  await loadScript('https://download.agora.io/sdk/release/AgoraRTC_N-4.20.0.js', 'data-agora-rtc');
+  await new Promise<void>((resolve, reject) => {
+    if (document.querySelector('script[data-agora-rtc]')) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://download.agora.io/sdk/release/AgoraRTC_N-4.20.0.js';
+    s.setAttribute('data-agora-rtc', '1');
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('Failed to load Agora RTC SDK'));
+    document.head.appendChild(s);
+  });
   _AgoraRTC = (window as any).AgoraRTC;
   _AgoraRTC.setLogLevel(3);
   return _AgoraRTC;
 }
 
-async function getAgoraRTM(): Promise<any> {
-  if (_AgoraRTM) return _AgoraRTM;
-  await loadScript('https://download.agora.io/sdk/release/agora-rtm-sdk-1.5.1.js', 'data-agora-rtm');
-  _AgoraRTM = (window as any).AgoraRTM;
-  return _AgoraRTM;
-}
+// ── Signal: BroadcastChannel (same device) + sessionStorage flag ──────────────
+// Works instantly on same device across tabs/windows.
+// For cross-device: applicant writes signal to sessionStorage key via API,
+// agent polls the API every 2s.
+const SIGNAL_CHANNEL = 'vkyc-signal';
+const API_BASE = () => (window as any).__VKYC_API__ || 'http://localhost:3001/api/v1';
 
-// ── RTM Signal client (for applicant→agent messaging) ──────────────────────
 export class VkycSignal {
-  private client: any = null;
-  private channel: any = null;
+  private bc: BroadcastChannel | null = null;
+  private pollTimer: any = null;
   onMessage: (data: any) => void = () => {};
 
-  async connect(uid: string): Promise<void> {
-    console.log('[RTM] Loading SDK…');
-    const AgoraRTM = await getAgoraRTM();
-    console.log('[RTM] SDK loaded, creating instance…');
-    this.client = AgoraRTM.createInstance(APP_ID);
-    console.log('[RTM] Logging in as:', uid);
-    await this.client.login({ uid });
-    console.log('[RTM] Logged in, joining channel:', RTM_CHANNEL);
-    this.channel = this.client.createChannel(RTM_CHANNEL);
-    this.channel.on('ChannelMessage', (msg: any, senderId: string) => {
-      console.log('[RTM] Message received from', senderId, ':', msg.text);
-      try { this.onMessage(JSON.parse(msg.text)); } catch(e) { console.error('[RTM] Parse error:', e); }
-    });
-    await this.channel.join();
-    console.log('[RTM] Joined channel successfully');
-  }
-
+  // Applicant: send signal via BroadcastChannel + API
   async send(data: object): Promise<void> {
-    if (!this.channel) { console.error('[RTM] Cannot send — not connected'); return; }
-    const text = JSON.stringify(data);
-    console.log('[RTM] Sending message:', text);
-    await this.channel.sendMessage({ text });
-    console.log('[RTM] Message sent successfully');
+    console.log('[Signal] Sending:', data);
+    // 1. BroadcastChannel — works instantly on same device
+    try {
+      const bc = new BroadcastChannel(SIGNAL_CHANNEL);
+      bc.postMessage(data);
+      bc.close();
+      console.log('[Signal] BroadcastChannel sent');
+    } catch(e) { console.warn('[Signal] BroadcastChannel failed:', e); }
+
+    // 2. Store in sessionStorage for same-browser fallback
+    try {
+      sessionStorage.setItem('vkyc_signal', JSON.stringify({...data, ts: Date.now()}));
+      console.log('[Signal] sessionStorage written');
+    } catch(e) {}
+
+    // 3. POST to API for cross-device signalling
+    try {
+      await fetch(API_BASE() + '/signal', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(data)
+      });
+      console.log('[Signal] API signal posted');
+    } catch(e) { console.warn('[Signal] API post failed (expected if API not running):', e); }
   }
 
-  async disconnect(): Promise<void> {
-    try { await this.channel?.leave(); await this.client?.logout(); } catch {}
-    this.client = null; this.channel = null;
+  // Agent: listen via BroadcastChannel + poll API
+  startListening(): void {
+    console.log('[Signal] Agent starting to listen…');
+
+    // BroadcastChannel — instant for same device
+    try {
+      this.bc = new BroadcastChannel(SIGNAL_CHANNEL);
+      this.bc.onmessage = (evt) => {
+        console.log('[Signal] BroadcastChannel received:', evt.data);
+        this.onMessage(evt.data);
+      };
+      console.log('[Signal] BroadcastChannel listener active');
+    } catch(e) { console.warn('[Signal] BroadcastChannel not available:', e); }
+
+    // Poll API every 2s for cross-device
+    this.pollTimer = setInterval(async () => {
+      try {
+        const res = await fetch(API_BASE() + '/signal');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data?.type === 'applicant-ready') {
+          console.log('[Signal] API poll received:', data);
+          this.onMessage(data);
+          // Clear after receiving so it doesn't fire again
+          await fetch(API_BASE() + '/signal', { method: 'DELETE' });
+        }
+      } catch(e) {} // API may not be running — silent fail
+    }, 2000);
+  }
+
+  stop(): void {
+    this.bc?.close();
+    this.bc = null;
+    if (this.pollTimer) { clearInterval(this.pollTimer); this.pollTimer = null; }
   }
 }
 
-// ── RTC Video call ─────────────────────────────────────────────────────────
+// ── RTC Video call ─────────────────────────────────────────────────────────────
 export class VkycCall {
   private client: any = null;
   private localAudioTrack: any = null;

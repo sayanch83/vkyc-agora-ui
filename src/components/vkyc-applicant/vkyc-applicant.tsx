@@ -203,34 +203,31 @@ export class VkycApplicant {
     const s=Math.floor(Math.random()*12)+87; this.livenessScore=s;
     this.livenessPhase = s>=75?'pass':'fail';
     if(s>=75){
-      // Stop liveness camera stream before starting RTC (avoid double camera)
+      // Stop liveness camera — MUST fully release before Agora opens it
       if(this.livenessStream) {
         this.livenessStream.getTracks().forEach(t=>t.stop());
         this.livenessStream=null;
       }
-      await this.delay(1500);
+      await this.delay(800); // give browser time to release camera hardware
       this.step='session';
-      // Signal agent that applicant is ready — agent popup appears now
+      // Signal agent — popup appears on agent screen
       await this.notifyAgentReady();
-      // Then join RTC — applicant waits for agent to allow
+      // Join RTC after signalling
       await this.startAgoraCall();
     }
   }
 
   private async notifyAgentReady() {
     try {
-      const name = 'Harshit Sodagar';
-      console.log('[Applicant] Connecting to RTM to notify agent…');
+      console.log('[Applicant] Sending ready signal to agent…');
       this.signal = new VkycSignal();
-      await this.signal.connect('applicant-' + Date.now());
-      console.log('[Applicant] RTM connected, sending ready signal…');
       await this.signal.send({
         type: 'applicant-ready',
         caseId: this.caseId,
-        name,
+        name: 'Harshit Sodagar',
         ts: new Date().toISOString()
       });
-      console.log('[Applicant] Ready signal sent successfully');
+      console.log('[Applicant] Ready signal sent');
     } catch(e) {
       console.error('[Applicant] Could not notify agent:', e);
     }
