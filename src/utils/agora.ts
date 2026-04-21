@@ -161,9 +161,15 @@ export class VkycCall {
         this.remoteUsers.set(user.uid, { video: null, audio: null });
       }
       const entry = this.remoteUsers.get(user.uid)!;
-      if (mediaType === 'video') { entry.video = user.videoTrack; }
-      if (mediaType === 'audio') { entry.audio = user.audioTrack; user.audioTrack.play(); }
-      this.onRemoteJoined(user.uid, entry.video, entry.audio);
+      if (mediaType === 'audio') {
+        entry.audio = user.audioTrack;
+        user.audioTrack.play();
+      }
+      if (mediaType === 'video') {
+        entry.video = user.videoTrack;
+        // Only fire callback when we have a video track
+        this.onRemoteJoined(user.uid, entry.video, entry.audio);
+      }
     });
 
     this.client.on('user-unpublished', (user: any) => {
@@ -224,6 +230,22 @@ export class VkycCall {
 
   async setCam(enabled: boolean): Promise<void> {
     if (this.localVideoTrack) await this.localVideoTrack.setEnabled(enabled);
+  }
+
+  // Switch between front and rear camera (mobile)
+  private currentFacing: 'user' | 'environment' = 'user';
+  async switchCamera(): Promise<void> {
+    const AgoraRTC = await getAgoraRTC();
+    this.currentFacing = this.currentFacing === 'user' ? 'environment' : 'user';
+    if (this.localVideoTrack) {
+      await this.localVideoTrack.stop();
+      await this.localVideoTrack.close();
+    }
+    this.localVideoTrack = await AgoraRTC.createCameraVideoTrack({
+      facingMode: this.currentFacing
+    });
+    await this.client.publish([this.localVideoTrack]);
+    console.log('[RTC] Camera switched to:', this.currentFacing);
   }
 
   async leave(): Promise<void> {
