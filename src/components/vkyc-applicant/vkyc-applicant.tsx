@@ -232,33 +232,32 @@ export class VkycApplicant {
     }
   }
 
-  private getDeviceInfo(): object {
+  private buildDeviceStr(): {str: string; isMobile: boolean} {
     const ua = navigator.userAgent;
-    // OS detection
     let os = 'Unknown';
-    if (/android/i.test(ua)) os = 'Android';
-    else if (/iPad|iPhone|iPod/.test(ua)) os = 'iOS';
+    if (/Android/i.test(ua)) os = 'Android';
+    else if (/iPhone|iPad|iPod/.test(ua)) os = 'iOS';
     else if (/Windows/.test(ua)) os = 'Windows';
     else if (/Mac/.test(ua)) os = 'macOS';
     else if (/Linux/.test(ua)) os = 'Linux';
 
-    // Device type
     let deviceType = 'Desktop';
-    if (/Mobi|Android|iPhone|iPod/.test(ua)) deviceType = 'Mobile';
+    if (/Mobi|Android/.test(ua) && !/iPad/.test(ua)) deviceType = 'Mobile';
     else if (/iPad|Tablet/.test(ua)) deviceType = 'Tablet';
 
-    // Browser detection
-    let browser = 'Unknown';
-    if (/Chrome\//.test(ua) && !/Chromium|Edge/.test(ua)) browser = 'Chrome';
-    else if (/Firefox\//.test(ua)) browser = 'Firefox';
-    else if (/Safari\//.test(ua) && !/Chrome/.test(ua)) browser = 'Safari';
-    else if (/Edg\//.test(ua)) browser = 'Edge';
+    let browser = 'Browser';
+    if (/CriOS/.test(ua)) browser = 'Chrome';
+    else if (/FxiOS/.test(ua)) browser = 'Firefox';
+    else if (/Chrome/.test(ua) && !/Edge/.test(ua)) browser = 'Chrome';
+    else if (/Firefox/.test(ua)) browser = 'Firefox';
+    else if (/Safari/.test(ua) && !/Chrome/.test(ua)) browser = 'Safari';
+    else if (/Edge|Edg/.test(ua)) browser = 'Edge';
 
+    const icon = deviceType === 'Mobile' ? '📱' : deviceType === 'Tablet' ? '📟' : '💻';
+    const scr = window.screen.width + 'x' + window.screen.height;
     return {
-      deviceType,
-      os,
-      browser,
-      screen: `${window.screen.width}×${window.screen.height}`
+      str: icon + ' ' + deviceType + ' · ' + os + ' · ' + browser + ' · ' + scr,
+      isMobile: deviceType === 'Mobile' || deviceType === 'Tablet'
     };
   }
 
@@ -266,14 +265,27 @@ export class VkycApplicant {
     try {
       console.log('[Applicant] Sending ready signal to agent…');
       this.signal = new VkycSignal();
+      const dev = this.buildDeviceStr();
+
+      // Get geolocation
+      let geoStr = '';
+      try {
+        const pos = await new Promise<GeolocationPosition>((res, rej) =>
+          navigator.geolocation.getCurrentPosition(res, rej, {timeout: 5000})
+        );
+        geoStr = pos.coords.latitude.toFixed(4) + ',' + pos.coords.longitude.toFixed(4);
+      } catch(e) { geoStr = 'unavailable'; }
+
       await this.signal.send({
         type: 'applicant-ready',
         caseId: this.caseId,
         name: 'Harshit Sodagar',
-        ts: new Date().toISOString(),
-        device: this.getDeviceInfo()
+        ts: Date.now(),
+        deviceStr: dev.str,
+        isMobile: dev.isMobile,
+        geo: geoStr
       });
-      console.log('[Applicant] Ready signal sent');
+      console.log('[Applicant] Ready signal sent, device:', dev.str);
     } catch(e) {
       console.error('[Applicant] Could not notify agent:', e);
     }

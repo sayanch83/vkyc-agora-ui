@@ -86,11 +86,15 @@ export class VkycAgent {
           this.pendingApplicant = { name: data.name, caseId: matched.id };
           this.activeCase = matched;
           this.cases = this.cases.map(x => x.id===matched.id ? {...x, status:'in-progress'} : x);
-          if (data.device) {
-            const d = data.device;
-            const icon = d.deviceType === 'Mobile' ? '📱' : d.deviceType === 'Tablet' ? '📟' : '💻';
-            this.applicantDeviceStr = icon + ' ' + d.os + ' · ' + d.browser + ' · ' + d.screen;
-            this.applicantIsMobile = d.deviceType === 'Mobile' || d.deviceType === 'Tablet';
+          // Use pre-built strings from applicant
+          if (data.deviceStr) {
+            this.applicantDeviceStr = data.deviceStr;
+          }
+          if (data.isMobile !== undefined) {
+            this.applicantIsMobile = data.isMobile;
+          }
+          if (data.geo && data.geo !== 'unavailable') {
+            this.applicantDeviceStr = (this.applicantDeviceStr || '') + ' · 📍 ' + data.geo;
           }
           this.showAdmitModal = true;
         }
