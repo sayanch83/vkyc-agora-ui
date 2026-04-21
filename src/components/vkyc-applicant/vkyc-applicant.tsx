@@ -519,7 +519,6 @@ export class VkycApplicant {
   /* ── LIVENESS ────────────────────────────────────────────────────────────── */
   private renderLiveness() {
     const pct = ((10-this.countdown)/10)*100;
-    const circ = 2*Math.PI*54;
     const ringColor = this.livenessPhase==='pass'?'#00897b':this.livenessPhase==='fail'?'#d32f2f':'#0d2b6b';
     const phaseMsg: Record<string,string> = {
       counting: `Liveness check starts in ${this.countdown} second${this.countdown!==1?'s':''}`,
