@@ -190,6 +190,28 @@ export class VkycCall {
     }
   }
 
+  // Re-attach local video if srcObject is missing (after Stencil re-render)
+  replayLocal(container: HTMLElement): void {
+    if (!this.localVideoTrack) return;
+    const vid = container.querySelector('video') as HTMLVideoElement;
+    if (vid && !vid.srcObject) {
+      console.log('[RTC] Re-attaching local video after re-render');
+      this.localEl = container;
+      this.playInto(this.localVideoTrack, container, true);
+    }
+  }
+
+  // Re-attach remote video if srcObject is missing (after Stencil re-render)
+  replayRemote(uid: any, container: HTMLElement): void {
+    const track = this.remoteVideoTracks.get(uid);
+    if (!track) return;
+    const vid = container.querySelector('video') as HTMLVideoElement;
+    if (vid && !vid.srcObject) {
+      console.log('[RTC] Re-attaching remote video after re-render');
+      this.playInto(track, container, false);
+    }
+  }
+
   // Switch front/rear camera using Agora's built-in switchDevice
   async switchCamera(): Promise<void> {
     this.currentFacing = this.currentFacing === 'user' ? 'environment' : 'user';

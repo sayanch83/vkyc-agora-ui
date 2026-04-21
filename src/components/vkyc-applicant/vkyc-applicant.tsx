@@ -50,6 +50,7 @@ export class VkycApplicant {
   private cdTimer: any = null;
   private call: VkycCall|null = null;
   private signal: VkycSignal|null = null;
+  private _lastRemoteUid: any = null;
   private livenessStream: MediaStream|null = null;
   @State() remoteUid: number|null = null;
   @State() callError = '';
@@ -290,13 +291,19 @@ export class VkycApplicant {
       this.call = new VkycCall();
 
       this.call.onRemoteJoined = async (uid) => {
-        this.remoteUid = uid;
         console.log('[Applicant] Remote joined uid:', uid);
         let el = this.getEl('agora-agent');
         if (!el) el = await this.waitForEl('agora-agent');
         console.log('[Applicant] agora-agent found:', !!el);
-        if (el) this.call!.playRemote(uid, el);
-        else console.error('[Applicant] Could not find agora-agent element');
+        if (el) {
+          this.call!.playRemote(uid, el);
+          await new Promise(r => setTimeout(r, 100));
+          this._lastRemoteUid = uid;
+          this.remoteUid = uid;
+        } else {
+          this._lastRemoteUid = uid;
+          this.remoteUid = uid;
+        }
       };
       this.call.onRemoteLeft = () => { this.remoteUid = null; };
       this.call.onError = (msg) => { this.callError = msg; };
@@ -319,6 +326,17 @@ export class VkycApplicant {
     }
   }
 
+
+  componentDidUpdate() {
+    if (this.call && this.step === 'session') {
+      const selfEl = this.getEl('agora-self');
+      if (selfEl) this.call.replayLocal(selfEl);
+      if (this._lastRemoteUid !== null) {
+        const agentEl = this.getEl('agora-agent');
+        if (agentEl) this.call.replayRemote(this._lastRemoteUid, agentEl);
+      }
+    }
+  }
 
   private visibleSteps() { return APPLICANT_STEPS.filter(s=>s.id!=='aadhaar'); }
   private stepIdx() { return this.visibleSteps().findIndex(s=>s.id===this.step); }

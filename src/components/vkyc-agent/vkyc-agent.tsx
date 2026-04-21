@@ -53,12 +53,25 @@ export class VkycAgent {
   private timerRef: any;
   private call: VkycCall|null = null;
   private signal: VkycSignal|null = null;
+  private _lastRemoteUid: any = null;
   @State() remoteUid: number|null = null;
   @State() pendingApplicant: {name:string;caseId:string}|null = null;
 
   async componentDidLoad() {
     // Connect to RTM AFTER component renders (componentDidLoad is safer than componentWillLoad)
     await this.connectSignal();
+  }
+
+  componentDidUpdate() {
+    // Re-attach video streams after every Stencil re-render
+    if (this.call && this.view === 'session') {
+      const localEl = this.getEl('agora-local');
+      if (localEl) this.call.replayLocal(localEl);
+      if (this._lastRemoteUid !== null) {
+        const remoteEl = this.getEl('agora-remote');
+        if (remoteEl) this.call.replayRemote(this._lastRemoteUid, remoteEl);
+      }
+    }
   }
 
   private async connectSignal() {
@@ -111,15 +124,23 @@ export class VkycAgent {
       const agentUid = 1000 + Math.floor(Math.random() * 1000);
 
       this.call.onRemoteJoined = async (uid) => {
-        this.remoteUid = uid;
-        this.pushToast('Customer video connected','success');
-        console.log('[Agent] Remote joined uid:', uid, '- looking for agora-remote');
-        // Try immediately first, then retry
+        console.log('[Agent] Remote joined uid:', uid);
+        // Get element BEFORE setting state (state change triggers re-render)
         let el = this.getEl('agora-remote');
         if (!el) el = await this.waitForEl('agora-remote');
         console.log('[Agent] agora-remote found:', !!el);
-        if (el) this.call!.playRemote(uid, el);
-        else console.error('[Agent] Could not find agora-remote element');
+        if (el) {
+          // Play into the pre-existing <video> element
+          this.call!.playRemote(uid, el);
+          // Only update state AFTER playing — this prevents re-render from killing the video
+          await new Promise(r => setTimeout(r, 100));
+          this._lastRemoteUid = uid;
+          this.remoteUid = uid;
+          this.pushToast('Customer video connected','success');
+        } else {
+          this.remoteUid = uid;
+          console.error('[Agent] Could not find agora-remote element');
+        }
       };
       this.call.onRemoteLeft = () => {
         this.remoteUid = null;
