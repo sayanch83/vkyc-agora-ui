@@ -273,7 +273,7 @@ export class VkycApplicant {
       if (data.type === 'flip-camera') {
         // Switch between front and rear camera
         if (this.call) {
-          this.call.switchCamera().catch(e => console.warn('[Applicant] Camera switch failed:', e));
+          this.call.switchCamera(this.getEl('agora-self')).catch(e => console.warn('[Applicant] Camera switch failed:', e));
         }
       }
     };

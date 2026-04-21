@@ -187,37 +187,29 @@ export class VkycCall {
     await this.client.publish([this.localAudioTrack, this.localVideoTrack]);
   }
 
-  // Play local video into element — with retry
-  async playLocalWhenReady(getEl: () => HTMLElement | null, retries = 30): Promise<void> {
+  // Play local video — retry until element exists in DOM
+  async playLocalWhenReady(getEl: () => HTMLElement | null, retries = 40): Promise<void> {
     for (let i = 0; i < retries; i++) {
       const el = getEl();
-      if (el && el.clientWidth > 0 && this.localVideoTrack) {
-        this.localVideoTrack.play(el);
-        console.log('[RTC] Local video playing');
-        return;
+      if (el && this.localVideoTrack) {
+        try { this.localVideoTrack.play(el); console.log('[RTC] Local video playing'); return; }
+        catch(e) { console.warn('[RTC] Local play error:', e); }
       }
       await new Promise(r => setTimeout(r, 200));
     }
-    // Last resort — play anyway even if size unknown
-    const el = getEl();
-    if (el && this.localVideoTrack) { this.localVideoTrack.play(el); }
   }
 
-  // Play remote video into element — with retry
-  async playRemoteWhenReady(uid: any, getEl: () => HTMLElement | null, retries = 30): Promise<void> {
+  // Play remote video — retry until element exists and track is set
+  async playRemoteWhenReady(uid: any, getEl: () => HTMLElement | null, retries = 40): Promise<void> {
     for (let i = 0; i < retries; i++) {
       const el = getEl();
       const entry = this.remoteUsers.get(uid);
-      if (el && el.clientWidth > 0 && entry?.video) {
-        entry.video.play(el);
-        console.log('[RTC] Remote video playing for uid:', uid);
-        return;
+      if (el && entry?.video) {
+        try { entry.video.play(el); console.log('[RTC] Remote video playing uid:', uid); return; }
+        catch(e) { console.warn('[RTC] Remote play error:', e); }
       }
       await new Promise(r => setTimeout(r, 200));
     }
-    const el = getEl();
-    const entry = this.remoteUsers.get(uid);
-    if (el && entry?.video) { entry.video.play(el); }
   }
 
   playLocal(el: HTMLElement): void {
@@ -234,18 +226,36 @@ export class VkycCall {
 
   // Switch between front and rear camera (mobile)
   private currentFacing: 'user' | 'environment' = 'user';
-  async switchCamera(): Promise<void> {
+  private selfEl: HTMLElement | null = null; // reference to self-view element for replay
+
+  async switchCamera(selfEl?: HTMLElement | null): Promise<void> {
+    if (selfEl) this.selfEl = selfEl;
     const AgoraRTC = await getAgoraRTC();
     this.currentFacing = this.currentFacing === 'user' ? 'environment' : 'user';
-    if (this.localVideoTrack) {
-      await this.localVideoTrack.stop();
-      await this.localVideoTrack.close();
+    console.log('[RTC] Switching camera to:', this.currentFacing);
+    try {
+      // Unpublish and close old track
+      if (this.localVideoTrack) {
+        await this.client.unpublish([this.localVideoTrack]);
+        this.localVideoTrack.stop();
+        this.localVideoTrack.close();
+      }
+      // Create new track with opposite facing mode
+      this.localVideoTrack = await AgoraRTC.createCameraVideoTrack({
+        facingMode: this.currentFacing
+      });
+      // Publish to channel so remote sees new camera
+      await this.client.publish([this.localVideoTrack]);
+      // Replay into self-view element
+      const el = this.selfEl;
+      if (el) {
+        this.localVideoTrack.play(el);
+        console.log('[RTC] New camera playing in self-view');
+      }
+    } catch(e) {
+      console.error('[RTC] Camera switch failed:', e);
+      throw e;
     }
-    this.localVideoTrack = await AgoraRTC.createCameraVideoTrack({
-      facingMode: this.currentFacing
-    });
-    await this.client.publish([this.localVideoTrack]);
-    console.log('[RTC] Camera switched to:', this.currentFacing);
   }
 
   async leave(): Promise<void> {
