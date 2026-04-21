@@ -85,10 +85,11 @@ export class VkycAgent {
   }
 
   private async acceptCase(c: typeof MOCK_CASES[0]) {
-    // Manual accept from dashboard (fallback if RTM not working)
-    this.activeCase=c;
-    this.cases=this.cases.map(x=>x.id===c.id?{...x,status:'in-progress'}:x);
-    this.showAdmitModal=true;
+    // Agent manually accepts from dashboard — go straight to session
+    this.activeCase = c;
+    this.cases = this.cases.map(x=>x.id===c.id?{...x,status:'in-progress'}:x);
+    this.view = 'session';
+    await this.startAgoraCall();
   }
 
   // Retry playing video into element until it appears in DOM (max 20 tries)
@@ -310,7 +311,7 @@ export class VkycAgent {
           <div class="ct-header">
             <span style={{flex:'2'}}>Customer</span><span style={{flex:'1.5'}}>Application</span>
             <span style={{flex:'1'}}>Product / Amount</span><span style={{flex:'1'}}>Pre-check</span>
-            <span style={{flex:'1'}}>Status</span><span style={{flex:'0 0 110px'}}>Action</span>
+            <span style={{flex:'1'}}>Status</span><span style={{flex:'0 0 120px'}}>Status</span>
           </div>
           {filtered.length===0&&<div class="ct-empty">No cases match this filter</div>}
           {filtered.map(c=>{
@@ -322,7 +323,12 @@ export class VkycAgent {
                 <div style={{flex:'1'}}><div class="ct-meta">{c.product}</div><div class="ct-amount">₹{c.amount.toLocaleString('en-IN')}</div></div>
                 <div style={{flex:'1'}}>{lc?<span class={`lp ${lc.passed?'lp--pass':'lp--fail'}`}>{lc.passed?'✓':'✗'} {lc.score}%</span>:<span class="ct-meta">—</span>}</div>
                 <div style={{flex:'1'}}><span class="sp" style={{background:sc.bg,color:sc.color}}>{sc.label}</span>{c.status==='in-queue'&&<div class="ct-meta" style={{marginTop:'3px'}}>#{c.queuePos} · ~{c.waitMins}min</div>}</div>
-                <div style={{flex:'0 0 110px'}}>{(c.status==='in-queue'||c.status==='hold')&&<button class={`btn-accept ${c.status==='hold'?'btn-accept--hold':''}`} onClick={()=>this.acceptCase(c)}>{c.status==='hold'?'Resume':'Accept →'}</button>}</div>
+                <div style={{flex:'0 0 120px'}}>
+                  {c.status==='in-queue'&&<div class="ct-waiting">⏳ Awaiting applicant</div>}
+                  {c.status==='in-progress'&&<div class="ct-inprog">🔴 In Session</div>}
+                  {c.status==='approved'&&<div class="ct-done-lbl">✓ Approved</div>}
+                  {c.status==='rejected'&&<div class="ct-rej-lbl">✗ Rejected</div>}
+                </div>
               </div>
             );
           })}
@@ -344,7 +350,7 @@ export class VkycAgent {
               <div class="modal-title">Customer Requesting to Join</div>
               <div class="modal-body">Allow <strong>{this.pendingApplicant?.name||c.name}</strong> to enter the V-CIP session? They have completed pre-liveness check and are ready to connect.</div>
               <div class="modal-actions">
-                <button class="btn-deny" onClick={()=>{this.showAdmitModal=false;this.pendingApplicant=null;this.activeCase=null;this.cases=MOCK_CASES.map(c=>({...c}));}}>Deny</button>
+                <button class="btn-deny" onClick={()=>{this.showAdmitModal=false;this.pendingApplicant=null;this.activeCase=null;this.view='dashboard';this.cases=MOCK_CASES.map(c=>({...c}));}}>Deny</button>
                 <button class="btn-admit" onClick={()=>{this.showAdmitModal=false;this.view='session';this.startAgoraCall();}}>Allow</button>
               </div>
             </div>

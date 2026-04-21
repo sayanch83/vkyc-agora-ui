@@ -51,6 +51,7 @@ export class VkycApplicant {
   private cdTimer: any = null;
   private call: VkycCall|null = null;
   private signal: VkycSignal|null = null;
+  private livenessStream: MediaStream|null = null;
   @State() remoteUid: number|null = null;
   @State() callError = '';
 
@@ -164,9 +165,26 @@ export class VkycApplicant {
     this.allChecksPassed = Object.values(this.checks).every(v=>v==='pass'||v==='warn');
   }
 
-  private startCountdown() {
+  private async startCountdown() {
     clearInterval(this.queueTimer);
     this.step='liveness'; this.countdown=10; this.livenessPhase='counting';
+
+    // Open camera immediately so applicant sees themselves
+    try {
+      this.livenessStream = await navigator.mediaDevices.getUserMedia({ video:true, audio:false });
+      // Attach stream to video element once DOM renders
+      setTimeout(() => {
+        const root = this.el.shadowRoot || this.el;
+        const vid = root.querySelector('#liveness-cam') as HTMLVideoElement;
+        if (vid && this.livenessStream) {
+          vid.srcObject = this.livenessStream;
+          vid.play().catch(()=>{});
+        }
+      }, 300);
+    } catch(e) {
+      console.warn('Camera preview unavailable:', e);
+    }
+
     this.cdTimer = setInterval(async()=>{
       this.countdown=this.countdown-1;
       if(this.countdown<=0){ clearInterval(this.cdTimer); await this.runLiveness(); }
@@ -180,11 +198,16 @@ export class VkycApplicant {
     const s=Math.floor(Math.random()*12)+87; this.livenessScore=s;
     this.livenessPhase = s>=75?'pass':'fail';
     if(s>=75){
+      // Stop liveness camera stream before starting RTC (avoid double camera)
+      if(this.livenessStream) {
+        this.livenessStream.getTracks().forEach(t=>t.stop());
+        this.livenessStream=null;
+      }
       await this.delay(1500);
       this.step='session';
       // Signal agent that applicant is ready — agent popup appears now
       await this.notifyAgentReady();
-      // Then join RTC (agent will join after clicking Allow)
+      // Then join RTC — applicant waits for agent to allow
       await this.startAgoraCall();
     }
   }
@@ -527,7 +550,8 @@ export class VkycApplicant {
           ):(
             <Fragment>
               <div class="liveness-cam-box" style={{borderColor:ringColor}}>
-                  {(this.livenessPhase==='pass'||this.livenessPhase==='fail')&&(
+                <video id="liveness-cam" class="liveness-video" autoplay muted playsinline/>
+                {(this.livenessPhase==='pass'||this.livenessPhase==='fail')&&(
                   <div class={`liveness-overlay ${this.livenessPhase==='pass'?'liveness-overlay--pass':'liveness-overlay--fail'}`}>
                     {this.livenessPhase==='pass'?'✓':'✗'}
                   </div>
@@ -560,7 +584,7 @@ export class VkycApplicant {
             ))}
           </div>
           {this.livenessPhase==='fail'&&(
-            <button class="btn-primary" onClick={()=>{ this.livenessPhase='idle'; this.livenessScore=null; this.countdown=15; this.step='queue'; }}>
+            <button class="btn-primary" onClick={()=>{ if(this.livenessStream){this.livenessStream.getTracks().forEach(t=>t.stop());this.livenessStream=null;} this.livenessPhase='idle'; this.livenessScore=null; this.countdown=10; this.step='queue'; }}>
               Go Back &amp; Retry
             </button>
           )}

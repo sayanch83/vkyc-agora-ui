@@ -473,3 +473,18 @@
   object-fit: cover !important;
   display: block !important;
 }
+
+/* ── Live camera preview during liveness check ───────────── */
+.liveness-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 10px;
+  transform: scaleX(-1); /* mirror like a selfie camera */
+}
+.liveness-cam-box {
+  position: relative;
+  overflow: hidden;
+}
