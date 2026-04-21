@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Permissions-Policy" content="camera=*, microphone=*">
+  <meta name="description" content="RBI V-CIP compliant Video KYC Platform — Applicant, Agent & Auditor" />
+  <title>VKYC Platform</title>
+  <script>
+    // API base URL — overridden at build time by GitHub Actions secret VKYC_API_BASE
+    window.__VKYC_API__ = window.__VKYC_API__ || 'http://localhost:3001/api/v1';
+  </script>
+  <script type="module" src="./build/vkyc.esm.js"></script>
+  <script nomodule src="./build/vkyc.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body { font-family: system-ui, sans-serif; }
+    vkyc-app { display: block; min-height: 100vh; }
+  </style>
+</head>
+<body>
+  <vkyc-app></vkyc-app>
+</body>
+</html>

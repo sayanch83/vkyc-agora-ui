@@ -1,0 +1,90 @@
+/* vkyc-app.css — Launcher matching original product colour system */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+
+:host {
+  display: block;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  min-height: 100vh;
+  background: #F3F3F6;
+}
+
+.launcher { display: flex; flex-direction: column; min-height: 100vh; }
+
+.launcher-header {
+  background: #074994;
+  border-bottom: 3px solid #D38C1B;
+  padding: 14px 28px;
+}
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand-mark { width: 40px; height: 40px; border-radius: 10px; background: #D38C1B; display: flex; align-items: center; justify-content: center; }
+.bv  { color: #fff; font-size: 17px; font-weight: 800; }
+.bk  { color: #fff; font-size: 13px; font-weight: 700; opacity: 0.8; }
+.brand-name { font-size: 16px; font-weight: 700; color: #fff; }
+.brand-sub  { font-size: 10px; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 0.6px; }
+
+.launcher-body {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 48px 24px;
+}
+
+.hero { text-align: center; margin-bottom: 40px; }
+.hero-title {
+  font-size: 36px; font-weight: 800; color: #074994;
+  margin: 0 0 12px; line-height: 1.15;
+}
+.hero-sub {
+  font-size: 14px; color: #94a3b8;
+  max-width: 540px; margin: 0 auto; line-height: 1.6;
+}
+
+.role-grid {
+  display: flex; gap: 20px; flex-wrap: wrap;
+  justify-content: center; max-width: 900px; width: 100%;
+  margin-bottom: 36px;
+}
+
+.role-card {
+  flex: 1 1 240px; max-width: 280px;
+  background: #ffffff;
+  border: 2px solid #e2e8f0;
+  border-top: 4px solid #074994;
+  border-radius: 8px;
+  padding: 28px 24px;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  box-shadow: 0 2px 12px rgba(13,27,62,0.07);
+}
+.role-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 28px rgba(13,27,62,0.14);
+  border-color: #074994;
+}
+.role-card--agent   { border-top-color: #D38C1B; }
+.role-card--agent:hover { border-color: #D38C1B; }
+.role-card--auditor { border-top-color: #3067A6; }
+.role-card--auditor:hover { border-color: #3067A6; }
+
+.rc-icon { font-size: 40px; margin-bottom: 12px; display: block; }
+.rc-name { font-size: 19px; font-weight: 800; color: #074994; margin-bottom: 8px; }
+.rc-desc { font-size: 13px; color: #475569; line-height: 1.5; margin-bottom: 14px; }
+.rc-steps {
+  display: inline-block;
+  font-size: 11px; font-weight: 600; color: #94a3b8;
+  background: #f8fafc; border: 1px solid #e2e8f0;
+  padding: 4px 10px; border-radius: 20px;
+  margin-bottom: 16px;
+}
+.rc-arrow {
+  position: absolute; bottom: 20px; right: 20px;
+  font-size: 18px; color: #074994; font-weight: 700;
+}
+.role-card--agent .rc-arrow   { color: #D38C1B; }
+.role-card--auditor .rc-arrow { color: #3067A6; }
+
+.launcher-footer {
+  font-size: 12px; color: #94a3b8; text-align: center; line-height: 1.7;
+}
