@@ -232,6 +232,36 @@ export class VkycApplicant {
     }
   }
 
+  private getDeviceInfo(): object {
+    const ua = navigator.userAgent;
+    // OS detection
+    let os = 'Unknown';
+    if (/android/i.test(ua)) os = 'Android';
+    else if (/iPad|iPhone|iPod/.test(ua)) os = 'iOS';
+    else if (/Windows/.test(ua)) os = 'Windows';
+    else if (/Mac/.test(ua)) os = 'macOS';
+    else if (/Linux/.test(ua)) os = 'Linux';
+
+    // Device type
+    let deviceType = 'Desktop';
+    if (/Mobi|Android|iPhone|iPod/.test(ua)) deviceType = 'Mobile';
+    else if (/iPad|Tablet/.test(ua)) deviceType = 'Tablet';
+
+    // Browser detection
+    let browser = 'Unknown';
+    if (/Chrome\//.test(ua) && !/Chromium|Edge/.test(ua)) browser = 'Chrome';
+    else if (/Firefox\//.test(ua)) browser = 'Firefox';
+    else if (/Safari\//.test(ua) && !/Chrome/.test(ua)) browser = 'Safari';
+    else if (/Edg\//.test(ua)) browser = 'Edge';
+
+    return {
+      deviceType,
+      os,
+      browser,
+      screen: `${window.screen.width}×${window.screen.height}`
+    };
+  }
+
   private async notifyAgentReady() {
     try {
       console.log('[Applicant] Sending ready signal to agent…');
@@ -240,7 +270,8 @@ export class VkycApplicant {
         type: 'applicant-ready',
         caseId: this.caseId,
         name: 'Harshit Sodagar',
-        ts: new Date().toISOString()
+        ts: new Date().toISOString(),
+        device: this.getDeviceInfo()
       });
       console.log('[Applicant] Ready signal sent');
     } catch(e) {

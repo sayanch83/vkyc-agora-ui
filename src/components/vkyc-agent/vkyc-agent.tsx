@@ -56,6 +56,8 @@ export class VkycAgent {
   private _lastRemoteUid: any = null;
   @State() remoteUid: number|null = null;
   @State() pendingApplicant: {name:string;caseId:string}|null = null;
+  @State() applicantDevice: {deviceType:string;os:string;browser:string;screen:string}|null = null;
+  @State() applicantIsMobile = false;
 
   async componentDidLoad() {
     // Connect to RTM AFTER component renders (componentDidLoad is safer than componentWillLoad)
@@ -84,6 +86,10 @@ export class VkycAgent {
           this.pendingApplicant = { name: data.name, caseId: matched.id };
           this.activeCase = matched;
           this.cases = this.cases.map(x => x.id===matched.id ? {...x, status:'in-progress'} : x);
+          if (data.device) {
+            this.applicantDevice = data.device;
+            this.applicantIsMobile = data.device.deviceType === 'Mobile' || data.device.deviceType === 'Tablet';
+          }
           this.showAdmitModal = true;
         }
       };
@@ -426,6 +432,12 @@ export class VkycAgent {
                 : <span class="sb-tag sb-tag--amber">eKYC Valid</span>}
             </div>
             <div class="sb-assigned">Officer: Agent Kumar · AGT001</div>
+          {this.applicantDevice&&(
+            <div class="sb-device">
+              <span class="sb-device-icon">{this.applicantDevice.deviceType==='Mobile'?'📱':this.applicantDevice.deviceType==='Tablet'?'🖥️':'💻'}</span>
+              <span class="sb-device-info">{this.applicantDevice.os} · {this.applicantDevice.browser} · {this.applicantDevice.screen}</span>
+            </div>
+          )}
           </div>
 
           {/* Session status */}
@@ -468,7 +480,10 @@ export class VkycAgent {
             <button class={`sb-act ${!this.camOn?'sb-act--off':''}`} onClick={()=>{this.camOn=!this.camOn;this.call?.setCam(this.camOn);}}>
               {this.camOn?'📷':'📵'}<span>{this.camOn?'Camera':'Cam Off'}</span>
             </button>
-            <button class="sb-act" onClick={()=>this.sendFlipToApplicant()}>
+            <button class={`sb-act ${!this.applicantIsMobile?'sb-act--off':''}`}
+              disabled={!this.applicantIsMobile}
+              title={this.applicantIsMobile?'Switch applicant camera':'Flip only available on mobile'}
+              onClick={()=>this.sendFlipToApplicant()}>
               🔄<span>Flip</span>
             </button>
             <button class="sb-act sb-act--end" onClick={()=>{if(confirm('End this KYC session?'))this.endSession();}}>
