@@ -75,9 +75,11 @@ export class VkycAgent {
           this.showAdmitModal = true;
         }
       };
-      console.log('[VKYC Agent] RTM connected, listening for applicants…');
+      console.log('[VKYC Agent] RTM connected and listening for applicants on channel: vkyc-signal');
+      this.pushToast('Listening for applicants…','info');
     } catch(e) {
-      console.warn('[VKYC Agent] RTM connection failed:', e);
+      console.error('[VKYC Agent] RTM FAILED:', e);
+      this.pushToast('Signal connection failed: ' + (e as any).message,'error');
     }
   }
 

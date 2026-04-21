@@ -43,19 +43,28 @@ export class VkycSignal {
   onMessage: (data: any) => void = () => {};
 
   async connect(uid: string): Promise<void> {
+    console.log('[RTM] Loading SDK…');
     const AgoraRTM = await getAgoraRTM();
+    console.log('[RTM] SDK loaded, creating instance…');
     this.client = AgoraRTM.createInstance(APP_ID);
+    console.log('[RTM] Logging in as:', uid);
     await this.client.login({ uid });
+    console.log('[RTM] Logged in, joining channel:', RTM_CHANNEL);
     this.channel = this.client.createChannel(RTM_CHANNEL);
-    this.channel.on('ChannelMessage', (msg: any) => {
-      try { this.onMessage(JSON.parse(msg.text)); } catch {}
+    this.channel.on('ChannelMessage', (msg: any, senderId: string) => {
+      console.log('[RTM] Message received from', senderId, ':', msg.text);
+      try { this.onMessage(JSON.parse(msg.text)); } catch(e) { console.error('[RTM] Parse error:', e); }
     });
     await this.channel.join();
+    console.log('[RTM] Joined channel successfully');
   }
 
   async send(data: object): Promise<void> {
-    if (!this.channel) return;
-    await this.channel.sendMessage({ text: JSON.stringify(data) });
+    if (!this.channel) { console.error('[RTM] Cannot send — not connected'); return; }
+    const text = JSON.stringify(data);
+    console.log('[RTM] Sending message:', text);
+    await this.channel.sendMessage({ text });
+    console.log('[RTM] Message sent successfully');
   }
 
   async disconnect(): Promise<void> {

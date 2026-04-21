@@ -219,18 +219,20 @@ export class VkycApplicant {
 
   private async notifyAgentReady() {
     try {
-      const name = 'Harshit Sodagar'; // in production read from customer profile
+      const name = 'Harshit Sodagar';
+      console.log('[Applicant] Connecting to RTM to notify agent…');
       this.signal = new VkycSignal();
-      // Use unique UID for RTM (different from RTC uid=1)
       await this.signal.connect('applicant-' + Date.now());
+      console.log('[Applicant] RTM connected, sending ready signal…');
       await this.signal.send({
         type: 'applicant-ready',
         caseId: this.caseId,
         name,
         ts: new Date().toISOString()
       });
+      console.log('[Applicant] Ready signal sent successfully');
     } catch(e) {
-      console.warn('Could not notify agent:', e);
+      console.error('[Applicant] Could not notify agent:', e);
     }
   }
 
