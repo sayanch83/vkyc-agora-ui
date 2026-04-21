@@ -1,5 +1,5 @@
 import { Component, State, h, Fragment, Element } from '@stencil/core';
-import { VkycCall } from '../../utils/agora';
+import { VkycCall, VkycSignal } from '../../utils/agora';
 import { CONSENT_ITEMS, APPLICANT_STEPS } from '../../utils/constants';
 import type { ConsentMap, CheckStatus } from '../../utils/constants';
 
@@ -19,7 +19,7 @@ import type { ConsentMap, CheckStatus } from '../../utils/constants';
 export class VkycApplicant {
 
   @State() step: string = 'welcome';
-  @State() caseId: string = 'KYC-A7B3X2C'; // set from URL param or default
+  @State() caseId: string = 'KYC-DEMO-001'; // matches the single demo case
   @State() consents: ConsentMap = {};
   @State() acceptAll: boolean = false;
   @State() consentTimestamps: Record<string, string> = {};
@@ -50,6 +50,7 @@ export class VkycApplicant {
   private spokenCode = this.genCode();
   private cdTimer: any = null;
   private call: VkycCall|null = null;
+  private signal: VkycSignal|null = null;
   @State() remoteUid: number|null = null;
   @State() callError = '';
 
@@ -178,23 +179,58 @@ export class VkycApplicant {
     this.livenessPhase='analysing'; await this.delay(2200);
     const s=Math.floor(Math.random()*12)+87; this.livenessScore=s;
     this.livenessPhase = s>=75?'pass':'fail';
-    if(s>=75){ await this.delay(1500); this.step='session'; await this.startAgoraCall(); }
+    if(s>=75){
+      await this.delay(1500);
+      this.step='session';
+      // Signal agent that applicant is ready — agent popup appears now
+      await this.notifyAgentReady();
+      // Then join RTC (agent will join after clicking Allow)
+      await this.startAgoraCall();
+    }
+  }
+
+  private async notifyAgentReady() {
+    try {
+      const name = 'Harshit Sodagar'; // in production read from customer profile
+      this.signal = new VkycSignal();
+      // Use unique UID for RTM (different from RTC uid=1)
+      await this.signal.connect('applicant-' + Date.now());
+      await this.signal.send({
+        type: 'applicant-ready',
+        caseId: this.caseId,
+        name,
+        ts: new Date().toISOString()
+      });
+    } catch(e) {
+      console.warn('Could not notify agent:', e);
+    }
+  }
+
+  // Retry playing video into element until it appears in DOM
+  private async playWhenReady(elementId: string, playFn: (el: HTMLElement) => void, retries = 20) {
+    for (let i = 0; i < retries; i++) {
+      const root = this.el.shadowRoot || this.el;
+      const el = root.querySelector('#' + elementId) as HTMLElement|null;
+      if (el) { playFn(el); return; }
+      await new Promise(r => setTimeout(r, 150));
+    }
+    console.warn('Could not find element:', elementId);
   }
 
   private async startAgoraCall() {
     // Start session timer
     let t=0;
     const tim = setInterval(()=>{t++;this.sessionSecs=t;},1000);
+    (this as any)._sessionTimer = tim;
 
     try {
       this.call = new VkycCall();
-      // Applicant always joins as UID 1
+
       this.call.onRemoteJoined = (uid, videoTrack) => {
         this.remoteUid = uid;
-        setTimeout(() => {
-          const el = this.el.shadowRoot?.querySelector('#agora-agent');
-          if (el && videoTrack) videoTrack.play(el as HTMLElement);
-        }, 200);
+        if (videoTrack) {
+          this.playWhenReady('agora-agent', (el) => videoTrack.play(el));
+        }
       };
       this.call.onRemoteLeft = () => {
         this.remoteUid = null;
@@ -203,21 +239,16 @@ export class VkycApplicant {
         this.callError = msg;
       };
 
+      // The step='session' is already set — DOM is rendered
+      // Join channel (applicant UID = 1)
       await this.call.join(this.caseId, 1);
 
-      // Play own video
-      setTimeout(() => {
-        const el = this.el.shadowRoot?.querySelector('#agora-self');
-        if (el) this.call!.playLocal(el as HTMLElement);
-      }, 200);
+      // Play own video — wait for #agora-self to appear
+      this.playWhenReady('agora-self', (el) => this.call!.playLocal(el));
 
     } catch (e: any) {
       this.callError = e.message;
-      // Continue without video in fallback mode
     }
-
-    // Store timer ref for cleanup
-    (this as any)._sessionTimer = tim;
   }
 
 

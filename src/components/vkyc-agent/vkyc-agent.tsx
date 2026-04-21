@@ -1,24 +1,14 @@
 import { Component, State, h, Fragment, Element } from '@stencil/core';
-import { VkycCall } from '../../utils/agora';
+import { VkycCall, VkycSignal } from '../../utils/agora';
 import { QUESTIONNAIRE_ITEMS } from '../../utils/constants';
 import type { QuestionnaireMap } from '../../utils/constants';
 type Decision = 'approve'|'reject'|null;
 
-// Dynamic date helpers — always relative to today so eKYC status never stales
-const _d = (offsetDays: number): string => {
-  const d = new Date();
-  d.setDate(d.getDate() + offsetDays);
-  return d.toISOString().slice(0, 10);
-};
-const VALID_DATE   = _d(-1);   // yesterday  → always within 3 days → VALID
-const EXPIRED_DATE = _d(-10);  // 10 days ago → always > 3 days     → EXPIRED
+// Single demo case — valid eKYC, always fresh
+const _d = (offset: number) => { const d=new Date(); d.setDate(d.getDate()+offset); return d.toISOString().slice(0,10); };
 
 const MOCK_CASES = [
-  { id:'KYC-A7B3X2C', name:'Harshit Sodagar', mobile:'98765 43210', appId:'CDL2847391', product:'Personal Loan', amount:300000, pan:'AWEPD1123P', dob:'02/08/1979', father:'Suresh Kumar', address:'B-204, Andheri West, Mumbai 400058', aadhaarDate:VALID_DATE, status:'in-queue', queuePos:1, waitMins:4, geo:{lat:19.1136,lng:72.8697,city:'Andheri West, Mumbai'}, preCheckLiveness:{score:94.2,passed:true,method:'ISO-30107-3-Passive',ts:'10:28 AM'} },
-  { id:'KYC-D4F9Z1K', name:'Priya Sharma',   mobile:'87654 32109', appId:'CDL9302841', product:'Two Wheeler Loan', amount:85000, pan:'BSKPR2341C', dob:'15/03/1992', father:'Ramesh Sharma', address:'Flat 12, Koramangala, Bangalore 560034', aadhaarDate:EXPIRED_DATE, status:'in-queue', queuePos:2, waitMins:11, geo:{lat:12.9279,lng:77.6271,city:'Koramangala, Bangalore'}, preCheckLiveness:{score:91.7,passed:true,method:'ISO-30107-3-Passive',ts:'10:41 AM'} },
-  { id:'KYC-M2P7Y5R', name:'Anil Mehta',     mobile:'76543 21098', appId:'CDL5621034', product:'Credit Card', amount:150000, pan:'CFHME4512D', dob:'22/11/1985', father:'Kishore Mehta', address:'C-301, Sector 62, Noida 201309', aadhaarDate:EXPIRED_DATE, status:'hold', queuePos:0, waitMins:0, geo:{lat:28.6271,lng:77.3655,city:'Sector 62, Noida'}, preCheckLiveness:{score:88.1,passed:true,method:'ISO-30107-3-Passive',ts:'09:15 AM'} },
-  { id:'KYC-R8T6W3N', name:'Sunita Patel',   mobile:'65432 10987', appId:'CDL4012837', product:'Home Loan', amount:2500000, pan:'DJGSP7823F', dob:'08/07/1978', father:'Vijay Patel', address:'Plot 45, Bopal, Ahmedabad 380058', aadhaarDate:VALID_DATE, status:'approved', queuePos:0, waitMins:0, geo:{lat:23.0225,lng:72.4114,city:'Bopal, Ahmedabad'}, preCheckLiveness:null },
-  { id:'KYC-H5V2K8B', name:'Rahul Joshi',    mobile:'54321 09876', appId:'CDL7823019', product:'Personal Loan', amount:50000, pan:'EKHPJ1290G', dob:'30/01/1990', father:'Girish Joshi', address:'Near Baner Road, Pune 411045', aadhaarDate:EXPIRED_DATE, status:'rejected', queuePos:0, waitMins:0, geo:{lat:18.5590,lng:73.7868,city:'Baner, Pune'}, preCheckLiveness:null },
+  { id:'KYC-DEMO-001', name:'Harshit Sodagar', mobile:'98765 43210', appId:'CDL2847391', product:'Personal Loan', amount:300000, pan:'AWEPD1123P', dob:'02/08/1979', father:'Suresh Kumar', address:'B-204, Andheri West, Mumbai 400058', aadhaarDate:_d(-1), status:'in-queue', queuePos:1, waitMins:4, geo:{lat:19.1136,lng:72.8697,city:'Andheri West, Mumbai'}, preCheckLiveness:{score:94.2,passed:true,method:'ISO-30107-3-Passive',ts:'10:28 AM'} },
 ];
 
 @Component({ tag:'vkyc-agent', styleUrl:'vkyc-agent.css', shadow:true })
@@ -62,7 +52,29 @@ export class VkycAgent {
   private toastId = 0;
   private timerRef: any;
   private call: VkycCall|null = null;
+  private signal: VkycSignal|null = null;
   @State() remoteUid: number|null = null;
+  @State() pendingApplicant: {name:string;caseId:string}|null = null;
+
+  async componentWillLoad() {
+    // Connect to RTM signal channel to listen for applicant ready events
+    try {
+      this.signal = new VkycSignal();
+      await this.signal.connect('agent-001');
+      this.signal.onMessage = (data: any) => {
+        if (data.type === 'applicant-ready') {
+          // Find the matching case or use the demo case
+          const matched = this.cases.find(c => c.id === data.caseId) || this.cases[0];
+          this.pendingApplicant = { name: data.name, caseId: matched.id };
+          this.showAdmitModal = true;
+          this.activeCase = matched;
+          this.cases = this.cases.map(x => x.id===matched.id ? {...x, status:'in-progress'} : x);
+        }
+      };
+    } catch(e) {
+      console.warn('RTM signal failed, demo mode only:', e);
+    }
+  }
 
   private delay(ms:number) { return new Promise(r=>setTimeout(r,ms)); }
   private fmt() { return `${String(Math.floor(this.callTimer/60)).padStart(2,'0')}:${String(this.callTimer%60).padStart(2,'0')}`; }
@@ -73,25 +85,34 @@ export class VkycAgent {
   }
 
   private async acceptCase(c: typeof MOCK_CASES[0]) {
-    this.activeCase=c; this.view='session'; this.sessionState='connecting';
-    this.showAdmitModal=true;
+    // Manual accept from dashboard (fallback if RTM not working)
+    this.activeCase=c;
     this.cases=this.cases.map(x=>x.id===c.id?{...x,status:'in-progress'}:x);
+    this.showAdmitModal=true;
+  }
+
+  // Retry playing video into element until it appears in DOM (max 20 tries)
+  private async playWhenReady(elementId: string, playFn: (el: HTMLElement) => void, retries = 20) {
+    for (let i = 0; i < retries; i++) {
+      const root = this.el.shadowRoot || this.el;
+      const el = root.querySelector('#' + elementId) as HTMLElement|null;
+      if (el) { playFn(el); return; }
+      await new Promise(r => setTimeout(r, 150));
+    }
+    console.warn('Could not find element:', elementId);
   }
 
   private async startAgoraCall() {
     const c = this.activeCase!;
     try {
       this.call = new VkycCall();
-      // Agent UID = 1000 + random to avoid collision with applicant (UID 1)
       const agentUid = 1000 + Math.floor(Math.random() * 1000);
 
       this.call.onRemoteJoined = (uid, videoTrack) => {
         this.remoteUid = uid;
-        // Play remote (customer) video in the customer panel
-        setTimeout(() => {
-          const el = this.el.shadowRoot?.querySelector('#agora-remote');
-          if (el && videoTrack) videoTrack.play(el as HTMLElement);
-        }, 200);
+        if (videoTrack) {
+          this.playWhenReady('agora-remote', (el) => videoTrack.play(el));
+        }
         this.pushToast('Customer video connected','success');
       };
       this.call.onRemoteLeft = () => {
@@ -100,21 +121,19 @@ export class VkycAgent {
       };
       this.call.onError = (msg) => this.pushToast(msg,'error');
 
-      // Channel name = case ID (unique per case)
+      // Set live FIRST so DOM renders the video containers
+      this.sessionState = 'live';
+      this.timerRef = setInterval(()=>{ this.callTimer=this.callTimer+1; },1000);
+
+      // Join channel
       await this.call.join(c.id, agentUid);
 
-      // Play own (agent) video in the agent PiP panel
-      setTimeout(() => {
-        const el = this.el.shadowRoot?.querySelector('#agora-local');
-        if (el) this.call!.playLocal(el as HTMLElement);
-      }, 200);
+      // Play local video — wait for #agora-local to appear in DOM
+      this.playWhenReady('agora-local', (el) => this.call!.playLocal(el));
 
-      this.sessionState='live';
-      this.timerRef=setInterval(()=>{ this.callTimer=this.callTimer+1; },1000);
       this.pushToast(`Connected to ${c.name}`,'info');
     } catch (e: any) {
       this.pushToast('Camera/mic error: ' + e.message,'error');
-      // Fall back to simulated mode
       this.sessionState='live';
       this.timerRef=setInterval(()=>{ this.callTimer=this.callTimer+1; },1000);
     }
@@ -122,6 +141,7 @@ export class VkycAgent {
 
   private endSession() {
     if(this.call){this.call.leave();this.call=null;}
+    this.pendingApplicant=null;
     this.remoteUid=null;
     clearInterval(this.timerRef);
     this.view='dashboard'; this.callTimer=0; this.activeCase=null; this.sessionState='connecting';
@@ -322,10 +342,10 @@ export class VkycAgent {
           <div class="modal-overlay">
             <div class="modal-card animate-in">
               <div class="modal-title">Customer Requesting to Join</div>
-              <div class="modal-body">Allow <strong>{c.name}</strong> ({c.appId}) to enter the V-CIP session?</div>
+              <div class="modal-body">Allow <strong>{this.pendingApplicant?.name||c.name}</strong> to enter the V-CIP session? They have completed pre-liveness check and are ready to connect.</div>
               <div class="modal-actions">
-                <button class="btn-deny" onClick={()=>{this.showAdmitModal=false;this.endSession();}}>Deny</button>
-                <button class="btn-admit" onClick={()=>{this.showAdmitModal=false;this.startAgoraCall();}}>Allow</button>
+                <button class="btn-deny" onClick={()=>{this.showAdmitModal=false;this.pendingApplicant=null;this.activeCase=null;this.cases=MOCK_CASES.map(c=>({...c}));}}>Deny</button>
+                <button class="btn-admit" onClick={()=>{this.showAdmitModal=false;this.view='session';this.startAgoraCall();}}>Allow</button>
               </div>
             </div>
           </div>

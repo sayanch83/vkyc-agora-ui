@@ -4,6 +4,17 @@ import { Component, State, h } from '@stencil/core';
 export class VkycApp {
   @State() role: 'home'|'applicant'|'agent'|'auditor' = 'home';
 
+  componentWillLoad() {
+    // Auto-detect role from URL: ?role=agent or ?role=applicant
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const r = params.get('role') as any;
+      if (r === 'agent' || r === 'applicant' || r === 'auditor') {
+        this.role = r;
+      }
+    }
+  }
+
   render() {
     if(this.role==='applicant') return <vkyc-applicant />;
     if(this.role==='agent')     return <vkyc-agent />;
