@@ -187,16 +187,44 @@ export class VkycCall {
     await this.client.publish([this.localAudioTrack, this.localVideoTrack]);
   }
 
+  // Play video track natively using a <video> element we control
+  private playTrackInElement(track: any, container: HTMLElement, label: string): void {
+    try {
+      // Get the raw MediaStreamTrack from Agora
+      const mediaTrack: MediaStreamTrack = track.getMediaStreamTrack();
+      const stream = new MediaStream([mediaTrack]);
+
+      // Find or create a <video> element inside the container
+      let vid = container.querySelector('video') as HTMLVideoElement;
+      if (!vid) {
+        vid = document.createElement('video');
+        vid.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;background:#000;';
+        vid.autoplay = true;
+        vid.muted = true; // local: mute to avoid echo; remote: we handle audio separately
+        vid.playsInline = true;
+        container.appendChild(vid);
+      }
+      vid.srcObject = stream;
+      vid.play().catch(e => console.warn('[RTC] vid.play failed:', e));
+      console.log('[RTC]', label, 'playing natively');
+    } catch(e) {
+      // Fallback to Agora play if native fails
+      console.warn('[RTC] Native play failed, falling back to Agora:', e);
+      try { track.play(container); } catch(e2) {}
+    }
+  }
+
   // Play local video — retry until element exists in DOM
   async playLocalWhenReady(getEl: () => HTMLElement | null, retries = 40): Promise<void> {
     for (let i = 0; i < retries; i++) {
       const el = getEl();
       if (el && this.localVideoTrack) {
-        try { this.localVideoTrack.play(el); console.log('[RTC] Local video playing'); return; }
-        catch(e) { console.warn('[RTC] Local play error:', e); }
+        this.playTrackInElement(this.localVideoTrack, el, 'Local');
+        return;
       }
       await new Promise(r => setTimeout(r, 200));
     }
+    console.warn('[RTC] Could not find local video element after retries');
   }
 
   // Play remote video — retry until element exists and track is set
@@ -205,11 +233,37 @@ export class VkycCall {
       const el = getEl();
       const entry = this.remoteUsers.get(uid);
       if (el && entry?.video) {
-        try { entry.video.play(el); console.log('[RTC] Remote video playing uid:', uid); return; }
-        catch(e) { console.warn('[RTC] Remote play error:', e); }
+        // Remote audio is already playing via audioTrack.play() in user-published
+        // For video, use native approach - unmuted since it's remote
+        try {
+          const mediaTrack: MediaStreamTrack = entry.video.getMediaStreamTrack();
+          const stream = new MediaStream([mediaTrack]);
+          let vid = el.querySelector('video') as HTMLVideoElement;
+          if (!vid) {
+            vid = document.createElement('video');
+            vid.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;background:#000;';
+            vid.autoplay = true;
+            vid.muted = false;
+            vid.playsInline = true;
+            el.appendChild(vid);
+          }
+          vid.srcObject = stream;
+          vid.muted = false;
+          vid.play().catch(e => {
+            console.warn('[RTC] Remote vid.play failed, trying muted:', e);
+            vid.muted = true;
+            vid.play().catch(()=>{});
+          });
+          console.log('[RTC] Remote video playing natively for uid:', uid);
+          return;
+        } catch(e) {
+          console.warn('[RTC] Remote native play failed:', e);
+          try { entry.video.play(el); return; } catch(e2) {}
+        }
       }
       await new Promise(r => setTimeout(r, 200));
     }
+    console.warn('[RTC] Could not play remote video after retries');
   }
 
   playLocal(el: HTMLElement): void {
@@ -246,11 +300,10 @@ export class VkycCall {
       });
       // Publish to channel so remote sees new camera
       await this.client.publish([this.localVideoTrack]);
-      // Replay into self-view element
+      // Replay into self-view element natively
       const el = this.selfEl;
-      if (el) {
-        this.localVideoTrack.play(el);
-        console.log('[RTC] New camera playing in self-view');
+      if (el && this.localVideoTrack) {
+        this.playTrackInElement(this.localVideoTrack, el, 'Switched camera local');
       }
     } catch(e) {
       console.error('[RTC] Camera switch failed:', e);
