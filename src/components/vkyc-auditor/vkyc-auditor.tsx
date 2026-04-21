@@ -17,8 +17,30 @@ export class VkycAuditor {
   @State() auditRemarks = '';
   @State() busy = false;
   @State() toast: {msg:string;type:string}|null = null;
+  @State() recordingUrl: string|null = null;
+  @State() recordingLoading = false;
 
   private delay(ms:number) { return new Promise(r=>setTimeout(r,ms)); }
+
+  private async fetchRecording() {
+    this.recordingLoading = true;
+    this.recordingUrl = null;
+    try {
+      const API = (window as any).__VKYC_API__ || 'http://localhost:3001/api/v1';
+      const res = await fetch(API + '/recording');
+      const data = await res.json();
+      if (data.success && data.recording?.data) {
+        // Convert base64 back to blob URL
+        const byteStr = atob(data.recording.data);
+        const ab = new ArrayBuffer(byteStr.length);
+        const ia = new Uint8Array(ab);
+        for (let i = 0; i < byteStr.length; i++) ia[i] = byteStr.charCodeAt(i);
+        const blob = new Blob([ab], { type: data.recording.mimeType || 'video/webm' });
+        this.recordingUrl = URL.createObjectURL(blob);
+      }
+    } catch(e) { console.warn('[Auditor] Recording fetch failed:', e); }
+    this.recordingLoading = false;
+  }
   private showToast(msg:string,type='info') { this.toast={msg,type}; setTimeout(()=>{this.toast=null;},3500); }
 
   private toggleSection(id:string) {
@@ -172,25 +194,32 @@ export class VkycAuditor {
         <div class="review-body">
           {/* LEFT — recording + details */}
           <div class="review-left">
-            {/* Recording area — wavy illustration matching original */}
+            {/* Recording area — real video player */}
             <div class="recording-area">
-              <div class="wavy-bg">
-                <svg viewBox="0 0 600 200" preserveAspectRatio="none" style={{position:'absolute',bottom:'0',left:'0',right:'0',width:'100%',height:'100%',opacity:'0.35'}}>
-                  <path d="M0 180 Q150 120 300 160 Q450 200 600 140 L600 200 L0 200Z" fill="#cbd5e1"/>
-                  <path d="M0 160 Q150 100 300 140 Q450 180 600 120 L600 200 L0 200Z" fill="#e2e8f0"/>
-                </svg>
-                <div class="recording-content">
-                  <div class="play-btn-wrap">
-                    <button class="play-btn">▶</button>
-                    <span class="play-label">Play Session Recording</span>
-                  </div>
-                  <div class="video-scrub">
-                    <span class="scrub-time">0:00</span>
-                    <div class="scrub-track"><div class="scrub-fill"/></div>
-                    <span class="scrub-time">{c.duration}</span>
-                  </div>
+              {this.recordingLoading&&(
+                <div class="recording-loading">
+                  <div class="rl-spinner"/>
+                  <span>Loading session recording…</span>
                 </div>
-              </div>
+              )}
+              {!this.recordingLoading&&this.recordingUrl&&(
+                <div class="recording-player">
+                  <video
+                    src={this.recordingUrl}
+                    controls
+                    style={{width:'100%',height:'100%',objectFit:'contain',background:'#000',borderRadius:'8px'}}
+                  />
+                  <div class="recording-label">📹 Session Recording · {c.duration} · {c.date}</div>
+                </div>
+              )}
+              {!this.recordingLoading&&!this.recordingUrl&&(
+                <div class="recording-unavailable">
+                  <div class="ru-icon">📹</div>
+                  <div class="ru-title">No recording available</div>
+                  <div class="ru-sub">Recording is uploaded at end of session. Complete a live session first.</div>
+                  <button class="ru-retry" onClick={()=>this.fetchRecording()}>🔄 Check Again</button>
+                </div>
+              )}
             </div>
 
             {/* Metrics grid */}
