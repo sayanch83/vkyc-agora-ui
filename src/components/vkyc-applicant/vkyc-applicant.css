@@ -531,9 +531,7 @@
   position: relative;
   overflow: hidden;
   width: 100%;
-  /* Portrait aspect ratio (3:4) — ideal for face capture on mobile */
-  aspect-ratio: 3 / 4;
-  max-height: 420px;
+  height: 380px;
   border-radius: 16px;
   border: 3px solid;
   background: #0d1a2d;
@@ -542,10 +540,10 @@
   justify-content: center;
 }
 @media (min-width: 640px) {
-  .liveness-cam-box {
-    aspect-ratio: 4 / 3;
-    max-height: 320px;
-  }
+  .liveness-cam-box { height: 300px; }
+}
+@media (max-width: 639px) {
+  .liveness-cam-box { height: calc(100vw * 1.1); max-height: 440px; }
 }
 
 /* ── Received code display ────────────────────────────────── */

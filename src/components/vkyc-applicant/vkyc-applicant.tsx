@@ -41,6 +41,8 @@ export class VkycApplicant {
   @State() sigCaptured = false;
   @State() agentDone = false;
   @State() referenceId = '';
+  @State() demoApplicantName = 'Harshit Sodagar';
+  @State() demoCaseId = 'CDL2847391';
   @State() micOn = true;
   @State() camOn = true;
   @State() showReschedule = false;
@@ -307,7 +309,7 @@ export class VkycApplicant {
       await this.signal.send({
         type: 'applicant-ready',
         caseId: this.caseId,
-        name: 'Harshit Sodagar',
+        name: this.demoApplicantName,
         ts: Date.now(),
         deviceStr: dev.str,
         isMobile: dev.isMobile,

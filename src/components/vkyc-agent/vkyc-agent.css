@@ -663,3 +663,24 @@
 .lv-score-badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 12px; }
 .lv-score-pass ~ .lv-score-badge { background: #dcfce7; color: #166534; }
 .lv-score-fail ~ .lv-score-badge { background: #fee2e2; color: #991b1b; }
+
+/* ── Ready-to-connect row highlight ──────────────────────── */
+.ct-row--ready {
+  background: linear-gradient(90deg, #f0fdf4, #fff) !important;
+  border-left: 3px solid #00897b !important;
+  animation: pulse-ready 2s ease-in-out infinite;
+}
+@keyframes pulse-ready {
+  0%,100% { box-shadow: 0 0 0 0 rgba(0,137,123,0.15); }
+  50%      { box-shadow: 0 0 0 6px rgba(0,137,123,0); }
+}
+.ct-accept-btn {
+  padding: 7px 14px; background: #00897b; color: #fff;
+  border: none; border-radius: 8px; font-size: 12px; font-weight: 700;
+  cursor: pointer; white-space: nowrap; animation: pulse-btn 1.5s ease-in-out infinite;
+}
+.ct-accept-btn:hover { background: #00695c; }
+@keyframes pulse-btn {
+  0%,100% { transform: scale(1); }
+  50%      { transform: scale(1.04); }
+}

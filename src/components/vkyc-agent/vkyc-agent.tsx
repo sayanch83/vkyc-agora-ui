@@ -65,8 +65,45 @@ export class VkycAgent {
   @State() applicantIsMobile = false;
 
   async componentDidLoad() {
-    // Connect to RTM AFTER component renders (componentDidLoad is safer than componentWillLoad)
+    await this.loadDemoConfig();
     await this.connectSignal();
+  }
+
+  private async loadDemoConfig() {
+    try {
+      const API = (window as any).__VKYC_API__ || 'http://localhost:3001/api/v1';
+      const res = await fetch(API + '/demo-config');
+      const data = await res.json();
+      if (!data.success) return;
+      const a = data.config.applicant;
+      const offset = a.aadhaarOffset ?? -1;
+      const d = new Date(); d.setDate(d.getDate() + offset);
+      const aadhaarDate = d.toISOString().slice(0, 10);
+
+      // Build stub cases: 3 demo stubs + 1 live configurable case
+      const liveCase = {
+        id: 'KYC-DEMO-001', name: a.name, mobile: a.mobile, appId: a.appId,
+        product: a.product, amount: a.amount, pan: a.pan, dob: a.dob,
+        father: a.father, address: a.address, aadhaarDate,
+        status: 'in-queue', queuePos: 1, waitMins: 4,
+        geo: { lat: 19.1136, lng: 72.8697, city: 'Andheri West, Mumbai' },
+        preCheckLiveness: { score: 0, passed: false, method: 'ISO-30107-3-Passive', ts: '—' }
+      };
+
+      const stubCases = (data.config.queue || []).map((q: any, i: number) => ({
+        id: `STUB-${i+1}`, name: q.name, mobile: '9800000000', appId: `APP${100+i}`,
+        product: q.product, amount: q.amount, pan: '—', dob: '—', father: '—',
+        address: '—', aadhaarDate: new Date().toISOString().slice(0,10),
+        status: q.status, queuePos: i+2, waitMins: q.waitMins || 0,
+        geo: { lat: 0, lng: 0, city: '—' },
+        preCheckLiveness: { score: q.status==='completed'?91:0, passed: q.status==='completed', method:'ISO-30107-3-Passive', ts:'—' }
+      }));
+
+      this.cases = [liveCase, ...stubCases];
+      console.log('[Agent] Demo config loaded:', a.name);
+    } catch(e) {
+      console.warn('[Agent] Could not load demo config, using defaults:', e);
+    }
   }
 
   componentDidUpdate() {
@@ -666,25 +703,51 @@ export class VkycAgent {
         </div>
         <div class="case-table">
           <div class="ct-header">
-            <span style={{flex:'2'}}>Customer</span><span style={{flex:'1.5'}}>Application</span>
-            <span style={{flex:'1'}}>Product / Amount</span>
-            <span style={{flex:'1'}}>Status</span><span style={{flex:'0 0 120px'}}>Status</span>
+            <span style={{flex:'2'}}>Customer</span>
+            <span style={{flex:'1.5'}}>Application</span>
+            <span style={{flex:'1.2'}}>Product / Amount</span>
+            <span style={{flex:'1.2'}}>Queue Status</span>
+            <span style={{flex:'0 0 140px'}}>Action</span>
           </div>
           {filtered.length===0&&<div class="ct-empty">No cases match this filter</div>}
           {filtered.map(c=>{
-            const sc=scfg[c.status]||scfg['approved']; const lc=c.preCheckLiveness;
+            const sc=scfg[c.status]||scfg['approved'];
+            const isReady = c.status==='in-queue' && c.id === 'KYC-DEMO-001' && this.showAdmitModal;
             return (
-              <div class="ct-row">
-                <div style={{flex:'2'}}><div class="ct-name">{c.name}</div><div class="ct-meta">{c.mobile} · {c.id}</div></div>
+              <div class={`ct-row ${isReady?'ct-row--ready':''}`} onClick={()=>{ if(c.status!=='in-queue'||c.id!=='KYC-DEMO-001') return; }}>
+                <div style={{flex:'2'}}>
+                  <div class="ct-name">{c.name}</div>
+                  <div class="ct-meta">{c.mobile} · {c.id}</div>
+                </div>
                 <div style={{flex:'1.5'}}><div class="ct-appid">{c.appId}</div></div>
-                <div style={{flex:'1'}}><div class="ct-meta">{c.product}</div><div class="ct-amount">₹{c.amount.toLocaleString('en-IN')}</div></div>
-                <div style={{flex:'1'}}>{lc?<span class={`lp ${lc.passed?'lp--pass':'lp--fail'}`}>{lc.passed?'✓':'✗'} {lc.score}%</span>:<span class="ct-meta">—</span>}</div>
-                <div style={{flex:'1'}}><span class="sp" style={{background:sc.bg,color:sc.color}}>{sc.label}</span>{c.status==='in-queue'&&<div class="ct-meta" style={{marginTop:'3px'}}>#{c.queuePos} · ~{c.waitMins}min</div>}</div>
-                <div style={{flex:'0 0 120px'}}>
-                  {c.status==='in-queue'&&<div class="ct-waiting">⏳ Awaiting applicant</div>}
+                <div style={{flex:'1.2'}}>
+                  <div class="ct-meta">{c.product}</div>
+                  <div class="ct-amount">₹{c.amount.toLocaleString('en-IN')}</div>
+                </div>
+                <div style={{flex:'1.2'}}>
+                  <span class="sp" style={{background:sc.bg,color:sc.color}}>{sc.label}</span>
+                  {c.status==='in-queue'&&<div class="ct-meta" style={{marginTop:'3px'}}>#{c.queuePos} · ~{c.waitMins}min wait</div>}
+                  {c.status==='in-progress'&&<div class="ct-meta" style={{marginTop:'3px'}}>With another officer</div>}
+                </div>
+                <div style={{flex:'0 0 140px'}}>
+                  {isReady&&(
+                    <button class="ct-accept-btn" onClick={()=>{
+                      this.showAdmitModal=false;
+                      this.view='session';
+                      this.startAgoraCall();
+                    }}>🔔 Accept</button>
+                  )}
+                  {!isReady&&c.status==='in-queue'&&c.id==='KYC-DEMO-001'&&(
+                    <div class="ct-waiting">⏳ Awaiting liveness</div>
+                  )}
+                  {c.status==='in-queue'&&c.id!=='KYC-DEMO-001'&&(
+                    <div class="ct-waiting">⏳ In queue</div>
+                  )}
                   {c.status==='in-progress'&&<div class="ct-inprog">🔴 In Session</div>}
+                  {c.status==='in-session'&&<div class="ct-inprog">🔴 In Session</div>}
                   {c.status==='approved'&&<div class="ct-done-lbl">✓ Approved</div>}
                   {c.status==='rejected'&&<div class="ct-rej-lbl">✗ Rejected</div>}
+                  {c.status==='completed'&&<div class="ct-done-lbl">✓ Completed</div>}
                 </div>
               </div>
             );

@@ -9,7 +9,7 @@ export class VkycApp {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const r = params.get('role') as any;
-      if (r === 'agent' || r === 'applicant' || r === 'auditor') {
+      if (r === 'agent' || r === 'applicant' || r === 'auditor' || r === 'config') {
         this.role = r;
       }
     }
@@ -17,6 +17,7 @@ export class VkycApp {
 
   render() {
     if(this.role==='applicant') return <vkyc-applicant />;
+    if(this.role==='config')    return <vkyc-config />;
     if(this.role==='agent')     return <vkyc-agent />;
     if(this.role==='auditor')   return <vkyc-auditor />;
 
