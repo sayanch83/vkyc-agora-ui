@@ -219,3 +219,12 @@
 .ru-sub { font-size:12px; color:#9ca3af; text-align:center; }
 .ru-retry { margin-top:8px; padding:6px 16px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:6px; font-size:12px; cursor:pointer; color:#374151; }
 .ru-retry:hover { background:#e2e8f0; }
+
+/* ── Refresh button ──────────────────────────────────────── */
+.refresh-btn {
+  padding: 8px 14px; background: #f1f5f9;
+  border: 1.5px solid #e2e8f0; border-radius: 8px;
+  font-size: 12px; font-weight: 600; color: #374151;
+  cursor: pointer; white-space: nowrap; flex-shrink: 0;
+}
+.refresh-btn:hover { background: #e2e8f0; }

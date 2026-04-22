@@ -1,16 +1,16 @@
 import { Component, State, h } from '@stencil/core';
 import { AUDITOR_CHECK_SECTIONS } from '../../utils/constants';
 
-const MOCK = [
-  { id:'8a7b3c4d-001', extId:'1di972assalksdj345e', name:'Harshit Sodagar', status:'pending', callType:'VCIP', kycType:'digi-kyc', mobile:'8003929453', date:'13/04/2026', time:'12:23 PM–12:24 PM', liveness:{passed:true,score:94.2}, panFaceMatch:92, aadhaarFaceMatch:88, locationPass:true, consentOk:true, aadhaarFresh:true, ocrOk:true, officerName:'Agent Kumar', officerId:'AGT001', duration:'1m 24s', remarks:'', questionnaire:[{q:'What is your date of birth?',a:'pass'},{q:'According to your Aadhaar, what is your name?',a:'pass'}] },
+// Stub cases already decided — only show approved/rejected in auditor queue
+const MOCK_STUBS = [
   { id:'8a7b3c4d-002', extId:'1di972671sad779879365345e', name:'Advait Lachake', status:'completed', callType:'VCIP', kycType:'digi-kyc', mobile:'8003929453', date:'13/04/2026', time:'11:51 AM–11:53 AM', liveness:{passed:true,score:91.7}, panFaceMatch:91, aadhaarFaceMatch:85, locationPass:true, consentOk:true, aadhaarFresh:true, ocrOk:true, officerName:'Agent Kumar', officerId:'AGT001', duration:'2m 15s', remarks:'All checks passed.', questionnaire:[{q:'What is your date of birth?',a:'pass'},{q:'According to your Aadhaar, what is your name?',a:'pass'}] },
-  { id:'8a7b3c4d-003', extId:'1di972671g1', name:'Advait Lachake', status:'rejected', callType:'VCIP', kycType:'digi-kyc', mobile:'8003929453', date:'13/04/2026', time:'11:32 AM–11:35 AM', liveness:{passed:true,score:88.1}, panFaceMatch:62, aadhaarFaceMatch:58, locationPass:false, consentOk:true, aadhaarFresh:true, ocrOk:false, officerName:'Agent Priya', officerId:'AGT002', duration:'3m 45s', remarks:'Face match below threshold. DOB mismatch.', questionnaire:[{q:'What is your date of birth?',a:'fail'},{q:'According to your Aadhaar, what is your name?',a:'fail'}] },
+  { id:'8a7b3c4d-003', extId:'1di972671g1', name:'Neha Verma', status:'rejected', callType:'VCIP', kycType:'digi-kyc', mobile:'9811234567', date:'13/04/2026', time:'11:32 AM–11:35 AM', liveness:{passed:true,score:88.1}, panFaceMatch:62, aadhaarFaceMatch:58, locationPass:false, consentOk:true, aadhaarFresh:true, ocrOk:false, officerName:'Agent Priya', officerId:'AGT002', duration:'3m 45s', remarks:'Face match below threshold. DOB mismatch.', questionnaire:[{q:'What is your date of birth?',a:'fail'},{q:'According to your Aadhaar, what is your name?',a:'fail'}] },
 ];
 
 @Component({ tag:'vkyc-auditor', styleUrl:'vkyc-auditor.css', shadow:true })
 export class VkycAuditor {
-  @State() cases = [...MOCK];
-  @State() activeCase: typeof MOCK[0]|null = null;
+  @State() cases = [...MOCK_STUBS];
+  @State() activeCase: typeof MOCK_STUBS[0]|null = null;
   @State() filterStatus = 'all';
   @State() search = '';
   @State() expanded: string[] = ['acceptance','risk','identity'];
@@ -21,6 +21,70 @@ export class VkycAuditor {
   @State() recordingLoading = false;
 
   private delay(ms:number) { return new Promise(r=>setTimeout(r,ms)); }
+
+  async componentWillLoad() {
+    await this.loadCases();
+  }
+
+  private async loadCases() {
+    try {
+      const API = (window as any).__VKYC_API__ || 'http://localhost:3001/api/v1';
+
+      // Load stub names from queue config
+      let stubs = [...MOCK_STUBS];
+      try {
+        const cfgRes = await fetch(API + '/demo-config');
+        const cfgData = await cfgRes.json();
+        if (cfgData.success && cfgData.config?.queue) {
+          stubs = MOCK_STUBS.map((s, i) => ({
+            ...s,
+            name: cfgData.config.queue[i]?.name || s.name,
+          }));
+        }
+      } catch(e) {}
+
+      // Load real session result — only add to queue if agent made a decision
+      try {
+        const resRes = await fetch(API + '/session-result');
+        const resData = await resRes.json();
+        if (resData.success && resData.result) {
+          const r = resData.result;
+          const now = new Date(r.decidedAt || Date.now());
+          const date = now.toLocaleDateString('en-IN', {day:'2-digit', month:'2-digit', year:'numeric'});
+          const time = now.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
+          const liveCase = {
+            id: r.caseId || 'KYC-DEMO-001',
+            extId: 'LIVE-' + Date.now().toString(36).toUpperCase(),
+            name: r.applicantName || 'Unknown',
+            status: r.decision === 'approved' ? 'pending' : 'rejected', // pending = awaiting auditor review
+            callType: 'VCIP', kycType: 'digi-kyc',
+            mobile: '—', date, time: time + ' (today)',
+            liveness: { passed: true, score: r.livenessScore || 0 },
+            panFaceMatch: 85, aadhaarFaceMatch: 82,
+            locationPass: true, consentOk: true, aadhaarFresh: true, ocrOk: true,
+            officerName: r.officerName || 'Agent Kumar',
+            officerId: r.officerId || 'AGT001',
+            duration: '—', remarks: r.remarks || '',
+            questionnaire: [{q:'What is your date of birth?',a:'pass'},{q:'According to your Aadhaar, what is your name?',a:'pass'}]
+          };
+          // Only add if approved by agent — rejected cases skip auditor
+          if (r.decision === 'approved') {
+            this.cases = [liveCase, ...stubs];
+          } else {
+            this.cases = stubs;
+          }
+          console.log('[Auditor] Session result loaded:', r.applicantName, r.decision);
+          return;
+        }
+      } catch(e) {}
+
+      // No session result — show only stubs
+      this.cases = stubs;
+    } catch(e) {
+      console.warn('[Auditor] Could not load cases:', e);
+      this.cases = [...MOCK_STUBS];
+    }
+  }
 
   private async fetchRecording() {
     this.recordingLoading = true;
@@ -47,7 +111,7 @@ export class VkycAuditor {
     this.expanded = this.expanded.includes(id) ? this.expanded.filter(s=>s!==id) : [...this.expanded,id];
   }
 
-  private checkStatus(c: typeof MOCK[0], id:string): boolean|null {
+  private checkStatus(c: typeof MOCK_STUBS[0], id:string): boolean|null {
     return ({consent:c.consentOk,recording:c.consentOk,location:c.locationPass,liveness:c.liveness.passed,aadhaar:c.aadhaarFresh,pan_face:c.panFaceMatch>=70,adh_face:c.aadhaarFaceMatch>=70,ocr:c.ocrOk,questions:c.questionnaire.every(q=>q.a==='pass')} as Record<string,boolean>)[id]??null;
   }
 
@@ -109,6 +173,7 @@ export class VkycAuditor {
             <span class="search-icon">🔍</span>
             <input class="search-input" placeholder="Search by name or reference ID…" value={this.search} onInput={e=>{this.search=(e.target as HTMLInputElement).value;}} />
           </div>
+          <button class="refresh-btn" onClick={()=>this.loadCases()} title="Refresh queue">🔄 Refresh</button>
           <div class="filter-chips">
             {['all','pending','completed','rejected'].map(f=>(
               <button class={`chip ${this.filterStatus===f?'chip--on':''}`} onClick={()=>{this.filterStatus=f;}}>

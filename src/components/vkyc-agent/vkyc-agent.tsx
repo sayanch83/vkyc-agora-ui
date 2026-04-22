@@ -672,6 +672,28 @@ export class VkycAgent {
     this.cases=this.cases.map(x=>x.id===this.activeCase!.id?{...x,status:type==='approve'?'approved':type==='reject'?'rejected':'escalated'}:x);
     const msgs: Record<string,string>={approve:'KYC Approved ✓',reject:'KYC Rejected'};
     this.pushToast(msgs[type!]??'Done',type==='approve'?'success':'error');
+    // Post decision to API so auditor can see it
+    try {
+      const API = (window as any).__VKYC_API__ || 'http://localhost:3001/api/v1';
+      await fetch(API + '/session-result', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          caseId:        this.activeCase?.id,
+          applicantName: this.activeCase?.name,
+          decision:      type === 'approve' ? 'approved' : 'rejected',
+          remarks:       this.remarks || '',
+          officerName:   'Agent Kumar',
+          officerId:     'AGT001',
+          livenessScore: this.activeCase?.preCheckLiveness?.score || 0,
+          inSessionScore: this.inSessionScore || 0,
+          pan:           this.activeCase?.pan,
+          product:       this.activeCase?.product,
+          amount:        this.activeCase?.amount,
+        })
+      });
+      console.log('[Agent] Decision posted to API:', type);
+    } catch(e) { console.warn('[Agent] Could not post decision:', e); }
     // Auto-disconnect after 5 seconds
     this.pushToast('Session will end in 5 seconds…','info');
     setTimeout(() => { this.endSession(); }, 5000);
