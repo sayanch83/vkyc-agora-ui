@@ -667,7 +667,7 @@ export class VkycAgent {
         <div class="case-table">
           <div class="ct-header">
             <span style={{flex:'2'}}>Customer</span><span style={{flex:'1.5'}}>Application</span>
-            <span style={{flex:'1'}}>Product / Amount</span><span style={{flex:'1'}}>Pre-check</span>
+            <span style={{flex:'1'}}>Product / Amount</span>
             <span style={{flex:'1'}}>Status</span><span style={{flex:'0 0 120px'}}>Status</span>
           </div>
           {filtered.length===0&&<div class="ct-empty">No cases match this filter</div>}
@@ -878,7 +878,15 @@ export class VkycAgent {
                       {this.liveness['face']==='pass'?'Passive Liveness Passed':this.liveness['face']==='checking'?'Running passive liveness analysis…':this.liveness['face']==='fail'?'Liveness Failed':'Not yet run'}
                     </div>
                     {this.livenessAttempt>0&&<div class="lv-passive-meta">In-session · Run #{this.livenessAttempt} · Score: {this.inSessionScore}% {this.inSessionScore&&this.inSessionScore>=60?'✓':'⚠'}</div>}
-                  {this.activeCase&&<div class="lv-passive-meta" style={{color:'#64748b'}}>Pre-session · Score: {this.activeCase.preCheckLiveness.score}% · {this.activeCase.preCheckLiveness.passed?'✓ Passed':'✗ Failed'}</div>}
+                  {this.activeCase&&(
+                    <div class="lv-presession-score">
+                      <span class="lv-score-label">Pre-session</span>
+                      <span class={`lv-score-val ${this.activeCase.preCheckLiveness.passed?'lv-score-pass':'lv-score-fail'}`}>
+                        {this.activeCase.preCheckLiveness.score}%
+                      </span>
+                      <span class="lv-score-badge">{this.activeCase.preCheckLiveness.passed?'✓ Passed':'✗ Failed'}</span>
+                    </div>
+                  )}
                   </div>
                   {this.livenessConfirmed&&!this.livenessRunning&&<div class="lv-ok">✅ Live Liveness Confirmed</div>}
                   <div class="lv-action-row">
@@ -1093,7 +1101,6 @@ export class VkycAgent {
           <div class="decision-summary">
             {[
               {l:'Pre-check',   v:lc?`${lc.score}% ${lc.passed?'✓':'✗'}`:'N/A',  ok:!!lc?.passed},
-              {l:'Pre-Session', v:this.activeCase?`${this.activeCase.preCheckLiveness.score}%`:'—', ok:!!(this.activeCase?.preCheckLiveness.passed)},
               {l:'In-Session',  v:this.inSessionScore===null?'Not run':this.inSessionScore===0?'Skipped':`${this.inSessionScore}%`, ok:this.inSessionScore!==null&&this.inSessionScore!==0&&this.inSessionScore>=60},
               {l:'Face Match',  v:this.faceMatchScore!==null?`${this.faceMatchScore}%`:'—',  ok:!!(this.faceMatchScore&&this.faceMatchScore>=80)},
               {l:'Location',    v:this.locationMatchScore!==null?`${this.locationMatchScore}%`:'—', ok:!!(this.locationMatchScore&&this.locationMatchScore>=85)},
