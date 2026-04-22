@@ -7,7 +7,7 @@ export class VkycConfig {
   @State() saved = false;
   @State() loading = true;
   @State() saving = false;
-  @State() form = {
+  @State() form: Record<string,string> = {
     name: '', mobile: '', appId: '', product: 'Personal Loan',
     amount: '300000', pan: '', dob: '', father: '', address: '',
     aadhaarOffset: '-1',
@@ -30,7 +30,7 @@ export class VkycConfig {
     this.loading = false;
   }
 
-  private set(field: string, val: string) {
+  private set(field: string, val: string): void {
     this.form = { ...this.form, [field]: val };
   }
 

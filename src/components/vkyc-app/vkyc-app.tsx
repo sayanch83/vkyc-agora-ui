@@ -2,7 +2,7 @@ import { Component, State, h } from '@stencil/core';
 
 @Component({ tag:'vkyc-app', styleUrl:'vkyc-app.css', shadow:true })
 export class VkycApp {
-  @State() role: 'home'|'applicant'|'agent'|'auditor' = 'home';
+  @State() role: 'home'|'applicant'|'agent'|'auditor'|'config' = 'home';
 
   componentWillLoad() {
     // Auto-detect role from URL: ?role=agent or ?role=applicant
