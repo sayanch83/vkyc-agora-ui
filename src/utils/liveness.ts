@@ -87,6 +87,19 @@ export interface LivenessResult {
   details: string;
 }
 
+// Capture a snapshot from video into canvas and return as ImageBitmap
+async function captureFrame(videoEl: HTMLVideoElement, canvas: HTMLCanvasElement): Promise<boolean> {
+  if (!videoEl || videoEl.readyState < 2) return false;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return false;
+  try {
+    ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+    return true;
+  } catch(e) {
+    return false;
+  }
+}
+
 // Analyse a single video frame for liveness signals
 export async function analyseFrame(
   videoEl: HTMLVideoElement,
@@ -94,42 +107,58 @@ export async function analyseFrame(
 ): Promise<LivenessResult> {
   const mesh = await loadMediaPipe();
 
+  // Capture frame to canvas first to avoid cross-origin issues with MediaStream
+  const ok = await captureFrame(videoEl, canvas);
+  if (!ok) {
+    return { score: 30, faceDetected: false, eyesOpen: false,
+      headCentered: false, textureOk: false, blinkDetected: false,
+      details: 'Could not capture frame' };
+  }
+
   return new Promise((resolve) => {
     mesh.onResults((results: any) => {
       if (!results.multiFaceLandmarks?.length) {
-        resolve({ score: 0, faceDetected: false, eyesOpen: false,
-          headCentered: false, textureOk: false, blinkDetected: false,
-          details: 'No face detected' });
+        // No face — but check texture variance to detect blank/test scenarios
+        const variance = textureVariance(canvas, 0, 0, canvas.width, canvas.height);
+        resolve({ score: 10, faceDetected: false, eyesOpen: false,
+          headCentered: false, textureOk: variance > 50, blinkDetected: false,
+          details: 'No face detected - Var:' + variance.toFixed(0) });
         return;
       }
 
       const lm = results.multiFaceLandmarks[0];
 
-      // Eye openness — MediaPipe eye landmark indices
-      // Left eye: 362,385,387,263,373,380  Right eye: 33,160,158,133,153,144
-      const leftEAR  = eyeAspectRatio(lm, [362,385,387,263,373,380]);
-      const rightEAR = eyeAspectRatio(lm, [33,160,158,133,153,144]);
+      // Eye Aspect Ratio — normalise by face width for scale-independence
+      const faceWidth = Math.hypot(
+        lm[234].x - lm[454].x, lm[234].y - lm[454].y
+      );
+      const leftEAR  = eyeAspectRatio(lm, [362,385,387,263,373,380]) / (faceWidth + 0.001);
+      const rightEAR = eyeAspectRatio(lm, [33,160,158,133,153,144]) / (faceWidth + 0.001);
       const avgEAR   = (leftEAR + rightEAR) / 2;
-      const eyesOpen = avgEAR > 0.2;
+      // Threshold tuned for normalised EAR — lower threshold for video streams
+      const eyesOpen    = avgEAR > 0.08;
+      const blinkDetect = avgEAR < 0.05;
 
       // Head pose
-      const yaw         = getHeadYaw(lm);
-      const headCentered = Math.abs(yaw) < 15;
+      const yaw          = getHeadYaw(lm);
+      const headCentered = Math.abs(yaw) < 20;
 
-      // Texture variance in face region
-      const ctx = canvas.getContext('2d');
-      ctx?.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
-      const variance   = textureVariance(canvas, canvas.width*0.3, canvas.height*0.2, canvas.width*0.4, canvas.height*0.5);
-      const textureOk  = variance > 80; // printed photos have low variance
+      // Texture variance — measure sharpness
+      const variance = textureVariance(canvas, 
+        Math.floor(canvas.width*0.25), Math.floor(canvas.height*0.15),
+        Math.floor(canvas.width*0.5),  Math.floor(canvas.height*0.6));
+      const textureOk = variance > 40;
 
-      // Score components
       const scores = {
-        faceDetected: 30,
-        eyesOpen:     eyesOpen ? 25 : 0,
-        headCentered: headCentered ? 20 : 5,
-        texture:      textureOk ? 25 : 5,
+        faceDetected: 35,
+        eyesOpen:     eyesOpen ? 25 : 5,
+        headCentered: headCentered ? 20 : 8,
+        texture:      textureOk ? 20 : 5,
       };
       const total = Object.values(scores).reduce((a,b) => a+b, 0);
+
+      console.log('[Liveness] EAR:', avgEAR.toFixed(3), 'Yaw:', yaw.toFixed(1), 
+        'Var:', variance.toFixed(0), 'Eyes:', eyesOpen, 'Score:', total);
 
       resolve({
         score: Math.min(100, total),
@@ -137,12 +166,13 @@ export async function analyseFrame(
         eyesOpen,
         headCentered,
         textureOk,
-        blinkDetected: avgEAR < 0.15, // low EAR = blink in progress
-        details: `EAR:${avgEAR.toFixed(2)} Yaw:${yaw.toFixed(1)} Var:${variance.toFixed(0)}`
+        blinkDetected: blinkDetect,
+        details: `EAR:${avgEAR.toFixed(3)} Yaw:${yaw.toFixed(1)} Var:${variance.toFixed(0)}`
       });
     });
 
-    mesh.send({ image: videoEl });
+    // Send canvas image (not video) to MediaPipe — avoids cross-origin issues
+    mesh.send({ image: canvas });
   });
 }
 
@@ -162,6 +192,13 @@ export async function runPassiveLiveness(
   const interval = 500; // analyse every 500ms
 
   while (Date.now() - start < durationMs) {
+    // Draw current frame to canvas before analysis
+    try {
+      const ctx = canvas.getContext('2d');
+      if (ctx && videoEl.readyState >= 2) {
+        ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+      }
+    } catch(e) {}
     const r = await analyseFrame(videoEl, canvas);
     if (r.blinkDetected) blinkSeen = true;
     results.push(r);

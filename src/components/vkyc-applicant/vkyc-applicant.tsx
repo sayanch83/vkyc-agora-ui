@@ -311,7 +311,9 @@ export class VkycApplicant {
         ts: Date.now(),
         deviceStr: dev.str,
         isMobile: dev.isMobile,
-        geo: geoStr
+        geo: geoStr,
+        livenessScore: this.livenessScore || 0,
+        livenessPassed: this.livenessPhase === 'pass'
       });
       console.log('[Applicant] Ready signal sent, device:', dev.str);
     } catch(e) {

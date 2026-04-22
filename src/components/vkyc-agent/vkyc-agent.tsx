@@ -320,14 +320,18 @@ export class VkycAgent {
     try {
       // Get the applicant's remote video element
       const root = this.el.shadowRoot || this.el;
-      const remoteVid = root.querySelector('#remote-video') as HTMLVideoElement;
+      // Use the pre-created video element inside agora-remote container
+      const remoteContainer = root.querySelector('#agora-remote') as HTMLElement;
+      const remoteVid = remoteContainer?.querySelector('video') as HTMLVideoElement;
 
-      if (!remoteVid || !remoteVid.srcObject) {
-        throw new Error('No remote video available');
+      if (!remoteVid || remoteVid.readyState < 2) {
+        throw new Error('Remote video not ready (readyState: ' + remoteVid?.readyState + ')');
       }
 
       const canvas = document.createElement('canvas');
-      canvas.width = 320; canvas.height = 240;
+      canvas.width = remoteVid.videoWidth || 320;
+      canvas.height = remoteVid.videoHeight || 240;
+      console.log('[Liveness] Using remote video:', canvas.width+'x'+canvas.height, 'readyState:', remoteVid.readyState);
 
       // Run 4 frame analyses — 1 per check, 800ms apart
       const checks = ['face','blink','smile','turn'] as const;
@@ -854,7 +858,8 @@ export class VkycAgent {
                     <div class="lv-passive-label">
                       {this.liveness['face']==='pass'?'Passive Liveness Passed':this.liveness['face']==='checking'?'Running passive liveness analysis…':this.liveness['face']==='fail'?'Liveness Failed':'Not yet run'}
                     </div>
-                    {this.livenessAttempt>0&&<div class="lv-passive-meta">ISO 30107-3 · {this.livenessAttempt} run{this.livenessAttempt>1?'s':''} · Score: {this.inSessionScore}%</div>}
+                    {this.livenessAttempt>0&&<div class="lv-passive-meta">In-session · Run #{this.livenessAttempt} · Score: {this.inSessionScore}% {this.inSessionScore&&this.inSessionScore>=60?'✓':'⚠'}</div>}
+                  {this.activeCase&&<div class="lv-passive-meta" style={{color:'#64748b'}}>Pre-session · Score: {this.activeCase.preCheckLiveness.score}% · {this.activeCase.preCheckLiveness.passed?'✓ Passed':'✗ Failed'}</div>}
                   </div>
                   {this.livenessConfirmed&&!this.livenessRunning&&<div class="lv-ok">✅ Live Liveness Confirmed</div>}
                   <div class="lv-action-row">
@@ -1069,7 +1074,8 @@ export class VkycAgent {
           <div class="decision-summary">
             {[
               {l:'Pre-check',   v:lc?`${lc.score}% ${lc.passed?'✓':'✗'}`:'N/A',  ok:!!lc?.passed},
-              {l:'In-Session',  v:this.inSessionScore===null?'Not run':this.inSessionScore===0?'Skipped':`${this.inSessionScore}%`, ok:this.inSessionScore!==null&&this.inSessionScore!==0&&this.inSessionScore>=80},
+              {l:'Pre-Session', v:this.activeCase?`${this.activeCase.preCheckLiveness.score}%`:'—', ok:!!(this.activeCase?.preCheckLiveness.passed)},
+              {l:'In-Session',  v:this.inSessionScore===null?'Not run':this.inSessionScore===0?'Skipped':`${this.inSessionScore}%`, ok:this.inSessionScore!==null&&this.inSessionScore!==0&&this.inSessionScore>=60},
               {l:'Face Match',  v:this.faceMatchScore!==null?`${this.faceMatchScore}%`:'—',  ok:!!(this.faceMatchScore&&this.faceMatchScore>=80)},
               {l:'Location',    v:this.locationMatchScore!==null?`${this.locationMatchScore}%`:'—', ok:!!(this.locationMatchScore&&this.locationMatchScore>=85)},
               {l:'Name Match',  v:this.matchScores.name?`${this.matchScores.name}%`:'—',  ok:!!(this.matchScores.name&&this.matchScores.name>=80)},
