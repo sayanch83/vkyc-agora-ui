@@ -97,6 +97,25 @@ export class VkycAgent {
           if (devStr) this.applicantDeviceStr = devStr;
           if (data.isMobile !== undefined) this.applicantIsMobile = !!data.isMobile;
           console.log('[Agent] deviceStr:', devStr, 'isMobile:', data.isMobile, 'geo:', data.geo);
+
+          // Update pre-check liveness with real score from applicant MediaPipe run
+          if (data.livenessScore !== undefined) {
+            console.log('[Agent] Real pre-liveness score received:', data.livenessScore, 'passed:', data.livenessPassed);
+            const now = new Date();
+            const hh = now.getHours(), mm = now.getMinutes();
+            const ts = (hh%12||12) + ':' + mm.toString().padStart(2,'0') + ' ' + (hh>=12?'PM':'AM');
+            const updatedLiveness = {
+              score: Math.round(data.livenessScore),
+              passed: !!data.livenessPassed,
+              method: 'ISO-30107-3-Passive (MediaPipe)',
+              ts
+            };
+            this.cases = this.cases.map(x =>
+              x.id === matched.id ? { ...x, preCheckLiveness: updatedLiveness } : x
+            );
+            this.activeCase = { ...matched, preCheckLiveness: updatedLiveness };
+          }
+
           this.showAdmitModal = true;
         }
       };
@@ -1123,8 +1142,13 @@ export class VkycAgent {
               <div class="modal-title">🔔 Customer Ready to Join</div>
               <div class="modal-body">
                 <strong>{this.pendingApplicant?.name||this.activeCase?.name}</strong> has completed liveness verification and is requesting to join the V-CIP session.
+                {this.activeCase&&(
+                  <div style={{marginTop:'8px',fontSize:'12px',padding:'6px 10px',borderRadius:'6px',background: this.activeCase.preCheckLiveness.passed?'#f0fdf4':'#fef2f2',color: this.activeCase.preCheckLiveness.passed?'#166534':'#991b1b'}}>
+                    {this.activeCase.preCheckLiveness.passed?'✅':'❌'} Pre-session Liveness: {this.activeCase.preCheckLiveness.score}% · {this.activeCase.preCheckLiveness.passed?'Passed':'Failed'}
+                  </div>
+                )}
                 {this.applicantDeviceStr&&(
-                  <div style={{marginTop:'8px',fontSize:'12px',color:'#6b7280',background:'#f9fafb',padding:'6px 10px',borderRadius:'6px'}}>
+                  <div style={{marginTop:'6px',fontSize:'12px',color:'#6b7280',background:'#f9fafb',padding:'6px 10px',borderRadius:'6px'}}>
                     {this.applicantDeviceStr}
                   </div>
                 )}
