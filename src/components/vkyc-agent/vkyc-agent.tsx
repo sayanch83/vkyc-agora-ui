@@ -130,7 +130,7 @@ export class VkycAgent {
           const matched = this.cases.find(c => c.id === data.caseId) || this.cases[0];
           this.pendingApplicant = { name: data.name, caseId: matched.id };
           this.activeCase = matched;
-          this.cases = this.cases.map(x => x.id===matched.id ? {...x, status:'in-progress'} : x);
+          // Don't change status yet — only change when agent accepts
           // Build device display string
           let devStr = data.deviceStr || '';
           if (data.geo && data.geo !== 'unavailable') devStr += ' 📍 ' + data.geo;
@@ -744,8 +744,7 @@ export class VkycAgent {
           {filtered.map(c=>{
             const sc = scfg[c.status] || scfg['in-queue'];
             const dc = dcfg[c.status] || dcfg['in-queue'];
-            const isReady = c.status==='in-queue' && this.showAdmitModal &&
-              (this.pendingApplicant?.caseId === c.id || (!this.pendingApplicant && c.id === this.cases[0]?.id));
+            const isReady = this.showAdmitModal && this.pendingApplicant?.caseId === c.id;
             return (
               <div class={`ct-row ${isReady?'ct-row--ready':''}`}>
                 <div style={{flex:'2'}}>
@@ -762,6 +761,7 @@ export class VkycAgent {
                     <div class="ct-accept-row">
                       <button class="ct-accept-btn" onClick={()=>{
                         this.showAdmitModal=false;
+                        this.cases=this.cases.map(x=>x.id===this.activeCase?.id?{...x,status:'in-progress'}:x);
                         this.view='session';
                         this.startAgoraCall();
                       }}>🔔 Accept</button>

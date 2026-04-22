@@ -115,12 +115,25 @@ export class VkycApplicant {
     return result;
   }
 
-  componentWillLoad() {
+  async componentWillLoad() {
     // Read caseId from URL: ?caseId=KYC-A7B3X2C
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const id = params.get('caseId');
       if (id) this.caseId = id;
+    }
+    // Load demo config from API
+    try {
+      const API = (window as any).__VKYC_API__ || 'http://localhost:3001/api/v1';
+      const res = await fetch(API + '/demo-config');
+      const data = await res.json();
+      if (data.success && data.config?.applicant) {
+        const a = data.config.applicant;
+        this.demoApplicantName = a.name || 'Harshit Sodagar';
+        console.log('[Applicant] Config loaded, name:', this.demoApplicantName);
+      }
+    } catch(e) {
+      console.warn('[Applicant] Could not load demo config:', e);
     }
   }
 
