@@ -103,7 +103,7 @@
   padding: 24px 20px; min-height: 200px;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
 }
-.card-left--checks  { justify-content: flex-start; padding-top: 20px; gap: 0; min-height: 240px; }
+.card-left--checks  { justify-content: flex-start; padding-top: 12px; gap: 0; min-height: 0; }
 .card-left--dark    { background: #111827; }
 .card-left--success { background: var(--navy); }
 
@@ -531,7 +531,7 @@
   position: relative;
   overflow: hidden;
   width: 100%;
-  height: 380px;
+  height: 300px;
   border-radius: 16px;
   border: 3px solid;
   background: #0d1a2d;
@@ -543,7 +543,13 @@
   .liveness-cam-box { height: 300px; }
 }
 @media (max-width: 639px) {
-  .liveness-cam-box { height: calc(100vw * 1.1); max-height: 440px; }
+  /* On mobile: take up ~55% of viewport height for full face visibility */
+  .liveness-cam-box {
+    height: 55dvh;
+    max-height: 500px;
+    min-height: 320px;
+    border-radius: 12px;
+  }
 }
 
 /* ── Received code display ────────────────────────────────── */
@@ -568,7 +574,7 @@
 
   /* ── Core layout ── */
   .app-wrap { min-height: 100dvh; overflow-x: hidden; }
-  .vkyc-main { padding: 10px 12px 16px; }
+  .vkyc-main { padding: 6px 8px 12px; }
   .app-header { padding: 10px 12px; }
   .app-header-inner { padding: 0; }
 
@@ -596,9 +602,9 @@
   .fi { padding: 8px 10px !important; }
 
   /* ── Card ── */
-  .card-left { min-height: 160px !important; padding: 16px 14px !important; }
-  .card-left--checks { min-height: 180px !important; padding-top: 14px !important; }
-  .card-right { padding: 14px 14px !important; }
+  .card-left { min-height: 0 !important; padding: 10px 12px !important; }
+  .card-left--checks { min-height: 0 !important; padding-top: 10px !important; }
+  .card-right { padding: 10px 12px !important; }
 
   /* ── Consent ── */
   .section-title { font-size: 16px !important; margin-bottom: 6px !important; }

@@ -700,9 +700,18 @@ export class VkycAgent {
       rejected:     {color:'#d32f2f', label:'✗ Rejected'},
       escalated:    {color:'#7c3aed', label:'⚠ Escalated'},
     };
-    const filters=['all','in-queue','in-progress','in-session','completed','hold','approved','rejected'];
-    const filtered=this.filter==='all'?this.cases:this.cases.filter(c=>c.status===this.filter);
-    const counts=filters.reduce((a,f)=>{ a[f]=f==='all'?this.cases.length:this.cases.filter(c=>c.status===f).length; return a; },{} as Record<string,number>);
+    const filters=['all','in-queue','in-session','completed','rejected'];
+    const filtered = this.filter==='all' ? this.cases :
+        this.filter==='in-session' ? this.cases.filter(c=>c.status==='in-session'||c.status==='in-progress') :
+        this.filter==='completed'  ? this.cases.filter(c=>c.status==='completed'||c.status==='approved') :
+        this.cases.filter(c=>c.status===this.filter);
+    const counts: Record<string,number> = {
+        'all':       this.cases.length,
+        'in-queue':  this.cases.filter(c=>c.status==='in-queue').length,
+        'in-session':this.cases.filter(c=>c.status==='in-session'||c.status==='in-progress').length,
+        'completed': this.cases.filter(c=>c.status==='completed'||c.status==='approved').length,
+        'rejected':  this.cases.filter(c=>c.status==='rejected').length,
+      };
     return (
       <div class="dashboard animate-in">
         <div class="dash-head">
@@ -710,12 +719,18 @@ export class VkycAgent {
           <div class="officer-info"><div class="officer-av">AK</div><div><div class="officer-nm">Agent Kumar</div><div class="officer-id"><span class="online-dot">●</span> Online · AGT001</div></div></div>
         </div>
         <div class="stats-strip">
-          {[{l:'In Queue',v:counts['in-queue'],c:'#1d4ed8',bg:'#dbeafe'},{l:'In Progress',v:(counts['in-progress']||0)+(counts['in-session']||0),c:'#d97706',bg:'#fef3c7'},{l:'Completed',v:(counts['completed']||0)+(counts['approved']||0),c:'#00897b',bg:'#dcfce7'},{l:'Rejected',v:counts['rejected']||0,c:'#d32f2f',bg:'#fee2e2'}].map(s=>(
+          {[{l:'In Queue',v:counts['in-queue'],c:'#1d4ed8',bg:'#dbeafe'},{l:'In Progress',v:counts['in-session'],c:'#d97706',bg:'#fef3c7'},{l:'Completed',v:counts['completed'],c:'#00897b',bg:'#dcfce7'},{l:'Rejected',v:counts['rejected'],c:'#d32f2f',bg:'#fee2e2'}].map(s=>(
             <div class="stat-pill" style={{background:s.bg}}><span class="stat-v" style={{color:s.c}}>{s.v}</span><span class="stat-l" style={{color:s.c}}>{s.l}</span></div>
           ))}
         </div>
         <div class="filter-bar">
-          {filters.map(f=>(<button class={`fb ${this.filter===f?'fb--on':''}`} onClick={()=>{this.filter=f;}}>{f==='all'?'All Cases':scfg[f]?.label||f} <span class="fb-count">{counts[f]||0}</span></button>))}
+          {filters.map(f=>{
+            const labels: Record<string,string> = {
+              all:'All Cases','in-queue':'🕐 Waiting',
+              'in-session':'🔴 In Session','completed':'✅ Completed','rejected':'✗ Rejected'
+            };
+            return <button class={`fb ${this.filter===f?'fb--on':''}`} onClick={()=>{this.filter=f;}}>{labels[f]||f} <span class="fb-count">{counts[f]||0}</span></button>;
+          })}
         </div>
         <div class="case-table">
           <div class="ct-header">
