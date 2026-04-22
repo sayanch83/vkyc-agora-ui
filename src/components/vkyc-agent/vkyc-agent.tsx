@@ -91,7 +91,10 @@ export class VkycAgent {
       };
 
       const stubCases = (data.config.queue || []).map((q: any, i: number) => ({
-        id: `STUB-${i+1}`, name: q.name, mobile: '9800000000', appId: `APP${100+i}`,
+        id: `KYC-${String(Math.floor(1000+i*317)).padStart(4,'0')}`,
+        name: q.name,
+        mobile: `98${String(10000000 + i*7919).slice(0,8)}`,
+        appId: `CDL${String(3000000 + i*1234)}`,
         product: q.product, amount: q.amount, pan: '—', dob: '—', father: '—',
         address: '—', aadhaarDate: new Date().toISOString().slice(0,10),
         status: q.status, queuePos: i+2, waitMins: q.waitMins || 0,
@@ -691,7 +694,7 @@ export class VkycAgent {
       'in-queue':   {color:'#9ca3af', label:'— Pending'},
       'in-progress':{color:'#9ca3af', label:'— Pending'},
       'in-session': {color:'#9ca3af', label:'— Pending'},
-      'completed':  {color:'#9ca3af', label:'— Pending'},
+      'completed':  {color:'#00897b', label:'✅ Approved'},
       hold:         {color:'#9ca3af', label:'— Pending'},
       approved:     {color:'#00897b', label:'✅ Approved'},
       rejected:     {color:'#d32f2f', label:'✗ Rejected'},
@@ -731,7 +734,7 @@ export class VkycAgent {
               <div class={`ct-row ${isReady?'ct-row--ready':''}`}>
                 <div style={{flex:'2'}}>
                   <div class="ct-name">{c.name}</div>
-                  <div class="ct-meta">{c.mobile} · {c.id}</div>
+                  <div class="ct-meta">{c.mobile}</div>
                 </div>
                 <div style={{flex:'1.5'}}><div class="ct-appid">{c.appId}</div></div>
                 <div style={{flex:'1.2'}}>
