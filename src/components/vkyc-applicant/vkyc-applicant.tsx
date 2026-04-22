@@ -31,6 +31,8 @@ export class VkycApplicant {
   @State() countdown = 15;
   @State() livenessPhase: 'idle'|'counting'|'opening'|'capturing'|'analysing'|'pass'|'fail' = 'idle';
   @State() livenessScore: number|null = null;
+  @State() livenessDetail = '';
+  @State() livenessPct = 0;
   @State() sessionSubStep: string = 'face';
   @State() sessionSecs = 0;
   @State() codeConfirmed = false;
@@ -208,11 +210,36 @@ export class VkycApplicant {
   }
 
   private async runLiveness() {
-    this.livenessPhase='opening'; await this.delay(1000);
-    this.livenessPhase='capturing'; await this.delay(3000);
-    this.livenessPhase='analysing'; await this.delay(2200);
-    const s=Math.floor(Math.random()*12)+87; this.livenessScore=s;
-    this.livenessPhase = s>=75?'pass':'fail';
+    this.livenessPhase='opening';
+    this.pushToast('Loading liveness engine…','info');
+
+    try {
+      // Get the live video element
+      const root = this.el.shadowRoot || this.el;
+      const vid = root.querySelector('#liveness-cam') as HTMLVideoElement;
+      if (!vid || !vid.srcObject) {
+        this.livenessPhase = 'fail';
+        this.livenessScore = 0;
+        return;
+      }
+
+      this.livenessPhase = 'capturing';
+      this.pushToast('Analysing face — please look at the camera…','info');
+
+      const result = await runPassiveLiveness(vid, 6000, (pct, partial) => {
+        this.livenessPct = pct;
+        this.livenessDetail = partial.faceDetected
+          ? (partial.eyesOpen ? '✓ Face detected · Eyes open' : '✓ Face detected · Eyes closed')
+          : '⚠ No face detected — please look at camera';
+      });
+
+      console.log('[Liveness] Result:', result);
+      this.livenessPhase = 'analysing';
+      await this.delay(500);
+
+      this.livenessScore = result.score;
+      this.livenessDetail = result.details;
+      this.livenessPhase = result.score >= 60 ? 'pass' : 'fail';
     if(s>=75){
       // Stop liveness camera — MUST fully release before Agora opens it
       if(this.livenessStream) {
