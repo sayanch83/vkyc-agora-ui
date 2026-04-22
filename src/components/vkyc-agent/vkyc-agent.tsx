@@ -677,14 +677,27 @@ export class VkycAgent {
   /* ── DASHBOARD ── */
   private renderDashboard() {
     const scfg: Record<string,{bg:string;color:string;label:string}> = {
-      'in-queue':{bg:'#dbeafe',color:'#1d4ed8',label:'In Queue'},
-      'in-progress':{bg:'#fef3c7',color:'#d97706',label:'In Progress'},
-      hold:{bg:'#f3e8ff',color:'#7c3aed',label:'On Hold'},
-      approved:{bg:'#dcfce7',color:'#00897b',label:'Approved'},
-      rejected:{bg:'#fee2e2',color:'#d32f2f',label:'Rejected'},
-      escalated:{bg:'#f3e8ff',color:'#7c3aed',label:'Escalated'},
+      'in-queue':   {bg:'#dbeafe',color:'#1d4ed8',  label:'🕐 Waiting'},
+      'in-progress':{bg:'#fef9c3',color:'#b45309',  label:'🔴 In Session'},
+      'in-session': {bg:'#fef9c3',color:'#b45309',  label:'🔴 In Session'},
+      'completed':  {bg:'#dcfce7',color:'#166534',  label:'✅ Completed'},
+      hold:         {bg:'#f3e8ff',color:'#7c3aed',  label:'⏸ On Hold'},
+      approved:     {bg:'#dcfce7',color:'#166534',  label:'✅ Completed'},
+      rejected:     {bg:'#fee2e2',color:'#991b1b',  label:'✅ Completed'},
+      escalated:    {bg:'#f3e8ff',color:'#7c3aed',  label:'⏸ Escalated'},
     };
-    const filters=['all','in-queue','in-progress','hold','approved','rejected'];
+    // Decision config — separate from queue status
+    const dcfg: Record<string,{color:string;label:string}> = {
+      'in-queue':   {color:'#9ca3af', label:'— Pending'},
+      'in-progress':{color:'#9ca3af', label:'— Pending'},
+      'in-session': {color:'#9ca3af', label:'— Pending'},
+      'completed':  {color:'#9ca3af', label:'— Pending'},
+      hold:         {color:'#9ca3af', label:'— Pending'},
+      approved:     {color:'#00897b', label:'✅ Approved'},
+      rejected:     {color:'#d32f2f', label:'✗ Rejected'},
+      escalated:    {color:'#7c3aed', label:'⚠ Escalated'},
+    };
+    const filters=['all','in-queue','in-progress','in-session','completed','hold','approved','rejected'];
     const filtered=this.filter==='all'?this.cases:this.cases.filter(c=>c.status===this.filter);
     const counts=filters.reduce((a,f)=>{ a[f]=f==='all'?this.cases.length:this.cases.filter(c=>c.status===f).length; return a; },{} as Record<string,number>);
     return (
@@ -694,7 +707,7 @@ export class VkycAgent {
           <div class="officer-info"><div class="officer-av">AK</div><div><div class="officer-nm">Agent Kumar</div><div class="officer-id"><span class="online-dot">●</span> Online · AGT001</div></div></div>
         </div>
         <div class="stats-strip">
-          {[{l:'In Queue',v:counts['in-queue'],c:'#1d4ed8',bg:'#dbeafe'},{l:'In Progress',v:counts['in-progress'],c:'#d97706',bg:'#fef3c7'},{l:'On Hold',v:counts['hold'],c:'#7c3aed',bg:'#f3e8ff'},{l:'Approved',v:counts['approved'],c:'#00897b',bg:'#dcfce7'},{l:'Rejected',v:counts['rejected'],c:'#d32f2f',bg:'#fee2e2'}].map(s=>(
+          {[{l:'In Queue',v:counts['in-queue'],c:'#1d4ed8',bg:'#dbeafe'},{l:'In Progress',v:(counts['in-progress']||0)+(counts['in-session']||0),c:'#d97706',bg:'#fef3c7'},{l:'Completed',v:(counts['completed']||0)+(counts['approved']||0),c:'#00897b',bg:'#dcfce7'},{l:'Rejected',v:counts['rejected']||0,c:'#d32f2f',bg:'#fee2e2'}].map(s=>(
             <div class="stat-pill" style={{background:s.bg}}><span class="stat-v" style={{color:s.c}}>{s.v}</span><span class="stat-l" style={{color:s.c}}>{s.l}</span></div>
           ))}
         </div>
@@ -707,14 +720,15 @@ export class VkycAgent {
             <span style={{flex:'1.5'}}>Application</span>
             <span style={{flex:'1.2'}}>Product / Amount</span>
             <span style={{flex:'1.2'}}>Queue Status</span>
-            <span style={{flex:'0 0 140px'}}>Action</span>
+            <span style={{flex:'1'}}>Decision</span>
           </div>
           {filtered.length===0&&<div class="ct-empty">No cases match this filter</div>}
           {filtered.map(c=>{
-            const sc=scfg[c.status]||scfg['approved'];
-            const isReady = c.status==='in-queue' && c.id === 'KYC-DEMO-001' && this.showAdmitModal;
+            const sc = scfg[c.status] || scfg['in-queue'];
+            const dc = dcfg[c.status] || dcfg['in-queue'];
+            const isReady = c.status==='in-queue' && c.id==='KYC-DEMO-001' && this.showAdmitModal;
             return (
-              <div class={`ct-row ${isReady?'ct-row--ready':''}`} onClick={()=>{ if(c.status!=='in-queue'||c.id!=='KYC-DEMO-001') return; }}>
+              <div class={`ct-row ${isReady?'ct-row--ready':''}`}>
                 <div style={{flex:'2'}}>
                   <div class="ct-name">{c.name}</div>
                   <div class="ct-meta">{c.mobile} · {c.id}</div>
@@ -725,29 +739,22 @@ export class VkycAgent {
                   <div class="ct-amount">₹{c.amount.toLocaleString('en-IN')}</div>
                 </div>
                 <div style={{flex:'1.2'}}>
-                  <span class="sp" style={{background:sc.bg,color:sc.color}}>{sc.label}</span>
-                  {c.status==='in-queue'&&<div class="ct-meta" style={{marginTop:'3px'}}>#{c.queuePos} · ~{c.waitMins}min wait</div>}
-                  {c.status==='in-progress'&&<div class="ct-meta" style={{marginTop:'3px'}}>With another officer</div>}
-                </div>
-                <div style={{flex:'0 0 140px'}}>
-                  {isReady&&(
+                  {isReady ? (
                     <button class="ct-accept-btn" onClick={()=>{
                       this.showAdmitModal=false;
                       this.view='session';
                       this.startAgoraCall();
-                    }}>🔔 Accept</button>
+                    }}>🔔 Ready — Accept</button>
+                  ) : (
+                    <Fragment>
+                      <span class="sp" style={{background:sc.bg,color:sc.color}}>{sc.label}</span>
+                      {(c.status==='in-queue')&&<div class="ct-meta" style={{marginTop:'3px'}}>#{c.queuePos} · ~{c.waitMins}min wait</div>}
+                      {(c.status==='in-progress'||c.status==='in-session')&&<div class="ct-meta" style={{marginTop:'3px'}}>With another officer</div>}
+                    </Fragment>
                   )}
-                  {!isReady&&c.status==='in-queue'&&c.id==='KYC-DEMO-001'&&(
-                    <div class="ct-waiting">⏳ Awaiting liveness</div>
-                  )}
-                  {c.status==='in-queue'&&c.id!=='KYC-DEMO-001'&&(
-                    <div class="ct-waiting">⏳ In queue</div>
-                  )}
-                  {c.status==='in-progress'&&<div class="ct-inprog">🔴 In Session</div>}
-                  {c.status==='in-session'&&<div class="ct-inprog">🔴 In Session</div>}
-                  {c.status==='approved'&&<div class="ct-done-lbl">✓ Approved</div>}
-                  {c.status==='rejected'&&<div class="ct-rej-lbl">✗ Rejected</div>}
-                  {c.status==='completed'&&<div class="ct-done-lbl">✓ Completed</div>}
+                </div>
+                <div style={{flex:'1'}}>
+                  <span class="ct-decision" style={{color:dc.color}}>{dc.label}</span>
                 </div>
               </div>
             );

@@ -684,3 +684,6 @@
   0%,100% { transform: scale(1); }
   50%      { transform: scale(1.04); }
 }
+
+/* ── Decision column ──────────────────────────────────── */
+.ct-decision { font-size: 12px; font-weight: 700; }

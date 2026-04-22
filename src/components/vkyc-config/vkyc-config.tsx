@@ -7,6 +7,11 @@ export class VkycConfig {
   @State() saved = false;
   @State() loading = true;
   @State() saving = false;
+  @State() queue: {name:string;product:string;amount:string;status:string}[] = [
+    {name:'Priya Mehta',  product:'Home Loan',     amount:'5000000', status:'completed'},
+    {name:'Rahul Verma',  product:'Car Loan',      amount:'800000',  status:'in-session'},
+    {name:'Anita Sharma', product:'Personal Loan', amount:'200000',  status:'in-queue'},
+  ];
   @State() form: Record<string,string> = {
     name: '', mobile: '', appId: '', product: 'Personal Loan',
     amount: '300000', pan: '', dob: '', father: '', address: '',
@@ -19,6 +24,12 @@ export class VkycConfig {
       const data = await res.json();
       if (data.success) {
         const a = data.config.applicant;
+        if (data.config.queue) {
+          this.queue = data.config.queue.map((q: any) => ({
+            name: q.name, product: q.product,
+            amount: String(q.amount), status: q.status
+          }));
+        }
         this.form = {
           name: a.name, mobile: a.mobile, appId: a.appId,
           product: a.product, amount: String(a.amount), pan: a.pan,
@@ -41,7 +52,8 @@ export class VkycConfig {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          applicant: { ...this.form, amount: parseInt(this.form.amount) || 0, aadhaarOffset: parseInt(this.form.aadhaarOffset) || -1 }
+          applicant: { ...this.form, amount: parseInt(this.form.amount) || 0, aadhaarOffset: parseInt(this.form.aadhaarOffset) || -1 },
+          queue: this.queue.map(q => ({ ...q, amount: parseInt(q.amount) || 0 }))
         })
       });
       this.saved = true;
@@ -120,6 +132,28 @@ export class VkycConfig {
                 </select>
               </div>
             </div>
+
+            <div class="card-title" style={{marginTop:'24px',paddingTop:'20px',borderTop:'1px solid #f1f5f9'}}>
+              👥 Background Queue (other cases in dashboard)
+            </div>
+            <div class="card-sub">These are the other cases shown in the agent queue to make the demo look realistic.</div>
+            {this.queue.map((q, i) => (
+              <div class="queue-row">
+                <div class="queue-idx">#{i+2}</div>
+                <input class="field-input" placeholder="Name" value={q.name}
+                  onInput={(e)=>{ const nq=[...this.queue]; nq[i]={...nq[i],name:(e.target as HTMLInputElement).value}; this.queue=nq; }}/>
+                <input class="field-input" placeholder="Product" value={q.product}
+                  onInput={(e)=>{ const nq=[...this.queue]; nq[i]={...nq[i],product:(e.target as HTMLInputElement).value}; this.queue=nq; }}/>
+                <input class="field-input" placeholder="Amount" type="number" value={q.amount}
+                  onInput={(e)=>{ const nq=[...this.queue]; nq[i]={...nq[i],amount:(e.target as HTMLInputElement).value}; this.queue=nq; }}/>
+                <select class="field-input"
+                  onInput={(e)=>{ const nq=[...this.queue]; nq[i]={...nq[i],status:(e.target as HTMLSelectElement).value}; this.queue=nq; }}>
+                  {['in-queue','in-session','completed','rejected'].map(s=>
+                    <option value={s} selected={q.status===s}>{s}</option>
+                  )}
+                </select>
+              </div>
+            ))}
 
             <div class="config-actions">
               <button class="btn-reset" onClick={() => this.reset()}>↺ Reset to Default</button>
