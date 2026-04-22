@@ -125,7 +125,12 @@ export class VkycAuditor {
   }
 
   private statusCfg(s:string) {
-    return ({pending:{bg:'#fef3c7',color:'#d97706',label:'Pending'},completed:{bg:'#dcfce7',color:'#00897b',label:'Completed'},rejected:{bg:'#fee2e2',color:'#d32f2f',label:'Rejected'}} as any)[s]||{bg:'#f1f5f9',color:'#475569',label:s};
+    return ({
+      pending:   {bg:'#fef3c7',color:'#d97706',  label:'⏳ Pending Audit'},
+      completed: {bg:'#dcfce7',color:'#166534',  label:'✅ Approved'},
+      approved:  {bg:'#dcfce7',color:'#166534',  label:'✅ Approved'},
+      rejected:  {bg:'#fee2e2',color:'#991b1b',  label:'✗ Rejected'},
+    } as any)[s]||{bg:'#f1f5f9',color:'#475569',label:s};
   }
 
   /* ── QUEUE ─────────────────────────────────────────────────── */
@@ -157,7 +162,7 @@ export class VkycAuditor {
         <div class="stat-strip">
           {[
             {l:'Pending Review',v:counts['pending'],  c:'#d97706',bg:'#fef3c7'},
-            {l:'Completed',     v:counts['completed'],c:'#00897b',bg:'#dcfce7'},
+            {l:'Approved',      v:counts['completed'],c:'#00897b',bg:'#dcfce7'},
             {l:'Rejected',      v:counts['rejected'], c:'#d32f2f',bg:'#fee2e2'},
             {l:'Total',         v:counts['all'],      c:'#0d2b6b',bg:'#dbeafe'},
           ].map(s=>(
@@ -400,7 +405,7 @@ export class VkycAuditor {
           <div class="review-footer">
             <button class="footer-back" onClick={()=>{this.activeCase=null;}}>← Back to Queue</button>
             <div class={`decision-banner decision-banner--${c.status}`}>
-              <span>{c.status==='completed'?'✅ KYC Approved by Auditor':'❌ KYC Rejected by Auditor'}</span>
+              <span>{c.status==='completed'||c.status==='approved'?'✅ Approved by Auditor':'✗ Rejected by Auditor'}</span>
               {c.remarks&&<small>{c.remarks}</small>}
             </div>
           </div>
