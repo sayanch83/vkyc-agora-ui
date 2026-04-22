@@ -744,7 +744,8 @@ export class VkycAgent {
           {filtered.map(c=>{
             const sc = scfg[c.status] || scfg['in-queue'];
             const dc = dcfg[c.status] || dcfg['in-queue'];
-            const isReady = c.status==='in-queue' && c.id==='KYC-DEMO-001' && this.showAdmitModal;
+            const isReady = c.status==='in-queue' && this.showAdmitModal &&
+              (this.pendingApplicant?.caseId === c.id || (!this.pendingApplicant && c.id === this.cases[0]?.id));
             return (
               <div class={`ct-row ${isReady?'ct-row--ready':''}`}>
                 <div style={{flex:'2'}}>
@@ -758,11 +759,18 @@ export class VkycAgent {
                 </div>
                 <div style={{flex:'1.2'}}>
                   {isReady ? (
-                    <button class="ct-accept-btn" onClick={()=>{
-                      this.showAdmitModal=false;
-                      this.view='session';
-                      this.startAgoraCall();
-                    }}>🔔 Ready — Accept</button>
+                    <div class="ct-accept-row">
+                      <button class="ct-accept-btn" onClick={()=>{
+                        this.showAdmitModal=false;
+                        this.view='session';
+                        this.startAgoraCall();
+                      }}>🔔 Accept</button>
+                      <button class="ct-deny-btn" onClick={()=>{
+                        this.showAdmitModal=false;
+                        this.pendingApplicant=null;
+                        this.activeCase=this.cases[0];
+                      }}>✕</button>
+                    </div>
                   ) : (
                     <Fragment>
                       <span class="sp" style={{background:sc.bg,color:sc.color}}>{sc.label}</span>
@@ -1230,31 +1238,7 @@ export class VkycAgent {
     return (
       <div class="vkyc-agent">
 
-        {/* Admit modal — top level so visible on dashboard AND session */}
-        {this.showAdmitModal&&(
-          <div class="modal-overlay">
-            <div class="modal-card animate-in">
-              <div class="modal-title">🔔 Customer Ready to Join</div>
-              <div class="modal-body">
-                <strong>{this.pendingApplicant?.name||this.activeCase?.name}</strong> has completed liveness verification and is requesting to join the V-CIP session.
-                {this.activeCase&&(
-                  <div style={{marginTop:'8px',fontSize:'12px',padding:'6px 10px',borderRadius:'6px',background: this.activeCase.preCheckLiveness.passed?'#f0fdf4':'#fef2f2',color: this.activeCase.preCheckLiveness.passed?'#166534':'#991b1b'}}>
-                    {this.activeCase.preCheckLiveness.passed?'✅':'❌'} Pre-session Liveness: {this.activeCase.preCheckLiveness.score}% · {this.activeCase.preCheckLiveness.passed?'Passed':'Failed'}
-                  </div>
-                )}
-                {this.applicantDeviceStr&&(
-                  <div style={{marginTop:'6px',fontSize:'12px',color:'#6b7280',background:'#f9fafb',padding:'6px 10px',borderRadius:'6px'}}>
-                    {this.applicantDeviceStr}
-                  </div>
-                )}
-              </div>
-              <div class="modal-actions">
-                <button class="btn-deny" onClick={()=>{this.showAdmitModal=false;this.pendingApplicant=null;this.activeCase=null;this.view='dashboard';this.cases=MOCK_CASES.map(c=>({...c}));}}>Deny</button>
-                <button class="btn-admit" onClick={()=>{this.showAdmitModal=false;this.view='session';this.startAgoraCall();}}>Allow</button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* No modal — signal triggers row highlight with Accept button instead */}
 
         <header class="agent-header">
           <div class="agent-header-inner">

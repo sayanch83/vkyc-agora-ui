@@ -687,3 +687,12 @@
 
 /* ── Decision column ──────────────────────────────────── */
 .ct-decision { font-size: 12px; font-weight: 700; }
+
+/* ── Accept/Deny row buttons ─────────────────────────────── */
+.ct-accept-row { display: flex; align-items: center; gap: 6px; }
+.ct-deny-btn {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: #fee2e2; border: none; color: #d32f2f;
+  font-size: 12px; font-weight: 700; cursor: pointer; flex-shrink: 0;
+}
+.ct-deny-btn:hover { background: #fca5a5; }
