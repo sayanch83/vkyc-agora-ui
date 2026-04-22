@@ -212,8 +212,6 @@ export class VkycApplicant {
 
   private async runLiveness() {
     this.livenessPhase = 'opening';
-    this.pushToast('Loading liveness engine…','info');
-
     try {
       const root = this.el.shadowRoot || this.el;
       const vid = root.querySelector('#liveness-cam') as HTMLVideoElement;
@@ -222,8 +220,6 @@ export class VkycApplicant {
       }
 
       this.livenessPhase = 'capturing';
-      this.pushToast('Analysing face — please look at the camera…','info');
-
       const result = await runPassiveLiveness(vid, 6000, (pct, partial) => {
         this.livenessPct = pct;
         this.livenessDetail = partial.faceDetected
