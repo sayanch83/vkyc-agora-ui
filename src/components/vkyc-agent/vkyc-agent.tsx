@@ -1,5 +1,6 @@
 import { Component, State, h, Fragment, Element } from '@stencil/core';
 import { VkycCall, VkycSignal } from '../../utils/agora';
+import { analyseFrame } from '../../utils/liveness';
 import { QUESTIONNAIRE_ITEMS } from '../../utils/constants';
 import type { QuestionnaireMap } from '../../utils/constants';
 type Decision = 'approve'|'reject'|null;
