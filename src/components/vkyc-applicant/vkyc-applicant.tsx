@@ -266,9 +266,10 @@ export class VkycApplicant {
         this.livenessStream = null;
         const root = this.el.shadowRoot || this.el;
         const vid = root.querySelector('#liveness-cam') as HTMLVideoElement;
-        if (vid) { vid.srcObject = null; vid.load(); }
+        if (vid) { vid.pause(); vid.srcObject = null; vid.load(); }
       }
-      await this.delay(1500);
+      // Wait for OS to fully release camera — some browsers need 2-3s
+      await this.delay(3000);
       this.step = 'session';
       await this.notifyAgentReady();
       await this.startAgoraCall();
