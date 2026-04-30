@@ -418,7 +418,20 @@ export class VkycApplicant {
       const agentEl = await this.waitForEl('agora-agent');
       console.log('[Applicant] Video containers found:', !!selfEl, !!agentEl);
 
-      await this.call.join(this.caseId, 1);
+      // Retry Agora join up to 3 times — mobile camera needs time to fully release
+      let joinAttempts = 0;
+      while (joinAttempts < 3) {
+        try {
+          await this.call.join(this.caseId, 1);
+          break; // success
+        } catch(e: any) {
+          joinAttempts++;
+          console.warn(`[Applicant] Agora join attempt ${joinAttempts} failed:`, e.message);
+          if (joinAttempts >= 3) throw e;
+          // Wait longer each retry to give camera time to release
+          await new Promise(r => setTimeout(r, joinAttempts * 2000));
+        }
+      }
 
       // Play local after join
       console.log('[Applicant] Playing local video, selfEl:', !!selfEl);
