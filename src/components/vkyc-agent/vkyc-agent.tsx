@@ -693,7 +693,7 @@ export class VkycAgent {
           // Real questionnaire answers from session
           questionnaire:  QUESTIONNAIRE_ITEMS.map(qi => ({
             q: qi.label + ' — ' + qi.prompt.replace(/Ask customer to /,''),
-            a: (this.questionnaireData?.[qi.id] || 'N/A')
+            a: (this.questionnaire?.[qi.id] || 'N/A')
           })),
           // Match scores
           panFaceMatch:    this.matchScores?.pan    || 0,
