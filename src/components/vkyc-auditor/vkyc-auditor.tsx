@@ -62,19 +62,21 @@ export class VkycAuditor {
             id: r.caseId || 'KYC-DEMO-001',
             extId: 'LIVE-' + Date.now().toString(36).toUpperCase(),
             name: r.applicantName || 'Unknown',
-            // Always show in auditor queue — status pending means awaiting audit sign-off
             status: 'pending',
             callType: 'VCIP', kycType: 'digi-kyc',
             mobile: '—', date, time: time + ' (today)',
-            liveness: { passed: true, score: r.livenessScore || 0 },
-            panFaceMatch: 85, aadhaarFaceMatch: 82,
-            locationPass: true, consentOk: true, aadhaarFresh: true, ocrOk: r.decision === 'approved',
+            liveness: { passed: (r.livenessScore || 0) >= 60, score: r.livenessScore || 0 },
+            inSessionScore: r.inSessionScore || 0,
+            panFaceMatch: r.panFaceMatch || 0,
+            aadhaarFaceMatch: 0,
+            locationPass: !!r.locationPass,
+            consentOk: true, aadhaarFresh: true,
+            ocrOk: !!r.ocrOk,
             officerName: r.officerName || 'Agent Kumar',
             officerId: r.officerId || 'AGT001',
             duration: '—',
-            // Show agent decision in remarks so auditor knows
-            remarks: (r.decision === 'approved' ? '✅ Agent approved. ' : '⚠ Agent rejected. ') + (r.remarks || ''),
-            questionnaire: [{q:'What is your date of birth?',a:'pass'},{q:'According to your Aadhaar, what is your name?',a:'pass'}]
+            remarks: (r.decision === 'approved' ? '✅ Agent Approved. ' : '⚠ Agent Rejected. ') + (r.remarks || ''),
+            questionnaire: r.questionnaire?.length ? r.questionnaire : Q.map(qi => ({ q: qi.q, a: 'N/A' }))
           };
           // Check if auditor has already decided this case
           try {
