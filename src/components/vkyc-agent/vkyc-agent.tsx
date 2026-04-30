@@ -679,17 +679,26 @@ export class VkycAgent {
         method: 'POST',
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify({
-          caseId:        this.activeCase?.id,
-          applicantName: this.activeCase?.name,
-          decision:      type === 'approve' ? 'approved' : 'rejected',
-          remarks:       this.remarks || '',
-          officerName:   'Agent Kumar',
-          officerId:     'AGT001',
-          livenessScore: this.activeCase?.preCheckLiveness?.score || 0,
+          caseId:         this.activeCase?.id,
+          applicantName:  this.activeCase?.name,
+          decision:       type === 'approve' ? 'approved' : 'rejected',
+          remarks:        this.remarks || '',
+          officerName:    'Agent Kumar',
+          officerId:      'AGT001',
+          livenessScore:  this.activeCase?.preCheckLiveness?.score || 0,
           inSessionScore: this.inSessionScore || 0,
-          pan:           this.activeCase?.pan,
-          product:       this.activeCase?.product,
-          amount:        this.activeCase?.amount,
+          pan:            this.activeCase?.pan,
+          product:        this.activeCase?.product,
+          amount:         this.activeCase?.amount,
+          // Real questionnaire answers from session
+          questionnaire:  QUESTIONNAIRE_ITEMS.map(qi => ({
+            q: qi.label + ' — ' + qi.prompt.replace(/Ask customer to /,''),
+            a: (this.questionnaireData?.[qi.id] || 'N/A')
+          })),
+          // Match scores
+          panFaceMatch:    this.matchScores?.pan    || 0,
+          locationPass:    !!(this.matchScores?.location && this.matchScores.location >= 70),
+          ocrOk:           !!(this.ocrData?.pan && this.ocrData.pan !== '— Not detected —'),
         })
       });
       console.log('[Agent] Decision posted to API:', type);

@@ -2,9 +2,15 @@ import { Component, State, h } from '@stencil/core';
 import { AUDITOR_CHECK_SECTIONS } from '../../utils/constants';
 
 // Stub cases already decided — only show approved/rejected in auditor queue
+const Q = [
+  {q:'Full Name — Customer stated name matches application?'},
+  {q:'Address & Pincode — Customer stated address correctly?'},
+  {q:'Date of Birth — Customer stated DOB matches Aadhaar?'},
+  {q:'Mobile Number — Aadhaar-linked mobile confirmed?'},
+];
 const MOCK_STUBS = [
-  { id:'8a7b3c4d-002', extId:'1di972671sad779879365345e', name:'Advait Lachake', status:'completed', callType:'VCIP', kycType:'digi-kyc', mobile:'8003929453', date:'13/04/2026', time:'11:51 AM–11:53 AM', liveness:{passed:true,score:91.7}, panFaceMatch:91, aadhaarFaceMatch:85, locationPass:true, consentOk:true, aadhaarFresh:true, ocrOk:true, officerName:'Agent Kumar', officerId:'AGT001', duration:'2m 15s', remarks:'All checks passed.', questionnaire:[{q:'What is your date of birth?',a:'pass'},{q:'According to your Aadhaar, what is your name?',a:'pass'}] },
-  { id:'8a7b3c4d-003', extId:'1di972671g1', name:'Neha Verma', status:'rejected', callType:'VCIP', kycType:'digi-kyc', mobile:'9811234567', date:'13/04/2026', time:'11:32 AM–11:35 AM', liveness:{passed:true,score:88.1}, panFaceMatch:62, aadhaarFaceMatch:58, locationPass:false, consentOk:true, aadhaarFresh:true, ocrOk:false, officerName:'Agent Priya', officerId:'AGT002', duration:'3m 45s', remarks:'Face match below threshold. DOB mismatch.', questionnaire:[{q:'What is your date of birth?',a:'fail'},{q:'According to your Aadhaar, what is your name?',a:'fail'}] },
+  { id:'8a7b3c4d-002', extId:'1di972671sad779879365345e', name:'Advait Lachake', status:'completed', callType:'VCIP', kycType:'digi-kyc', mobile:'8003929453', date:'13/04/2026', time:'11:51 AM–11:53 AM', liveness:{passed:true,score:91.7}, inSessionScore:88, panFaceMatch:91, aadhaarFaceMatch:85, locationPass:true, consentOk:true, aadhaarFresh:true, ocrOk:true, officerName:'Agent Kumar', officerId:'AGT001', duration:'2m 15s', remarks:'All checks passed.', questionnaire:[{q:Q[0].q,a:'Confirmed'},{q:Q[1].q,a:'Confirmed'},{q:Q[2].q,a:'Confirmed'},{q:Q[3].q,a:'Confirmed'}] },
+  { id:'8a7b3c4d-003', extId:'1di972671g1', name:'Neha Verma', status:'rejected', callType:'VCIP', kycType:'digi-kyc', mobile:'9811234567', date:'13/04/2026', time:'11:32 AM–11:35 AM', liveness:{passed:true,score:88.1}, inSessionScore:0, panFaceMatch:62, aadhaarFaceMatch:58, locationPass:false, consentOk:true, aadhaarFresh:true, ocrOk:false, officerName:'Agent Priya', officerId:'AGT002', duration:'3m 45s', remarks:'Face match below threshold. DOB mismatch.', questionnaire:[{q:Q[0].q,a:'Confirmed'},{q:Q[1].q,a:'Mismatch'},{q:Q[2].q,a:'Mismatch'},{q:Q[3].q,a:'Confirmed'}] },
 ];
 
 @Component({ tag:'vkyc-auditor', styleUrl:'vkyc-auditor.css', shadow:true })
@@ -70,7 +76,17 @@ export class VkycAuditor {
             remarks: (r.decision === 'approved' ? '✅ Agent approved. ' : '⚠ Agent rejected. ') + (r.remarks || ''),
             questionnaire: [{q:'What is your date of birth?',a:'pass'},{q:'According to your Aadhaar, what is your name?',a:'pass'}]
           };
-          // Always show in auditor queue — both approved and rejected need audit trail
+          // Check if auditor has already decided this case
+          try {
+            const auditRes = await fetch(API + '/audit-result');
+            const auditData = await auditRes.json();
+            if (auditData.success && auditData.result?.caseId === liveCase.id) {
+              liveCase.status = auditData.result.decision; // 'completed' or 'rejected'
+              liveCase.remarks = auditData.result.remarks || liveCase.remarks;
+              console.log('[Auditor] Existing audit decision found:', auditData.result.decision);
+            }
+          } catch(e) {}
+
           this.cases = [liveCase, ...stubs];
           console.log('[Auditor] Session result loaded:', r.applicantName, r.decision);
           return;
@@ -117,8 +133,26 @@ export class VkycAuditor {
   private async decide(type:'approve'|'reject') {
     if(!this.activeCase) return;
     if(type==='reject'&&!this.auditRemarks) { this.showToast('Remarks required for rejection','error'); return; }
-    this.busy=true; await this.delay(700); this.busy=false;
-    this.cases=this.cases.map(c=>c.id===this.activeCase!.id?{...c,status:type==='approve'?'completed':'rejected',remarks:this.auditRemarks}:c);
+    this.busy=true; await this.delay(700);
+    const finalStatus = type==='approve' ? 'completed' : 'rejected';
+    // Post audit decision to Railway API so it persists across refreshes
+    try {
+      const API = (window as any).__VKYC_API__ || 'http://localhost:3001/api/v1';
+      await fetch(API + '/audit-result', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          caseId:    this.activeCase.id,
+          decision:  finalStatus,
+          remarks:   this.auditRemarks,
+          auditorId: 'AUD001',
+          caseName:  this.activeCase.name,
+        })
+      });
+      console.log('[Auditor] Decision posted:', finalStatus);
+    } catch(e) { console.warn('[Auditor] Could not save decision:', e); }
+    this.busy=false;
+    this.cases=this.cases.map(c=>c.id===this.activeCase!.id?{...c,status:finalStatus,remarks:this.auditRemarks}:c);
     this.showToast(type==='approve'?'KYC Approved by Auditor ✓':'KYC Rejected',type==='approve'?'success':'error');
     this.activeCase=null;
   }
@@ -294,9 +328,9 @@ export class VkycAuditor {
             {/* Metrics grid */}
             <div class="metrics-grid">
               {[
-                {icon:'👁',label:'Liveness Score',val:`${c.liveness.score}%`,ok:c.liveness.passed,note:'ISO 30107-3'},
-                {icon:'🪪',label:'PAN Face Match',val:`${c.panFaceMatch}%`,ok:c.panFaceMatch>=80,note:c.panFaceMatch>=80?'Pass':'Review'},
-                {icon:'🔐',label:'Aadhaar Face Match',val:c.aadhaarFaceMatch?`${c.aadhaarFaceMatch}%`:'N/A',ok:c.aadhaarFaceMatch>=80,note:c.aadhaarFaceMatch>=80?'Pass':'Review'},
+                {icon:'👁',label:'Pre-session Liveness',val:`${c.liveness.score}%`,ok:c.liveness.passed,note:c.liveness.passed?'Passed':'Failed'},
+                {icon:'🎥',label:'In-session Liveness',val:(c as any).inSessionScore?`${(c as any).inSessionScore}%`:'Not run',ok:!!((c as any).inSessionScore&&(c as any).inSessionScore>=60),note:(c as any).inSessionScore?((c as any).inSessionScore>=60?'Passed':'Review'):'Skipped'},
+                {icon:'🪪',label:'PAN Face Match',val:`${c.panFaceMatch}%`,ok:c.panFaceMatch>=80,note:c.panFaceMatch>=80?'Completed':'Review'},
                 {icon:'📍',label:'Location Match',val:c.locationPass?'Verified':'Mismatch',ok:c.locationPass,note:c.locationPass?'Geo-tagged':'Check required'},
               ].map(m=>(
                 <div class="metric-card">
@@ -349,9 +383,12 @@ export class VkycAuditor {
                         const st=this.checkStatus(c,ch.id);
                         return (
                           <div class="ci-row">
-                            <span class={`ci-dot ${st===true?'ci-dot--ok':st===false?'ci-dot--fail':'ci-dot--na'}`}>{st===true?'✓':st===false?'✗':'—'}</span>
+                            <span class={`ci-dot ${st===true?'ci-dot--ok':st===false?'ci-dot--fail':'ci-dot--na'}`}>{st===true?'✓':st===false?'⚠':'—'}</span>
                             <span class="ci-label">{ch.label}</span>
-                            <span class={`ci-badge ${st===true?'cib--ok':st===false?'cib--fail':'cib--na'}`}>{st===true?'Pass':st===false?'Fail':'N/A'}</span>
+                            <span class={`ci-badge ${st===true?'cib--ok':st===false?'cib--fail':'cib--na'}`}>
+                              {st===true?'Completed':st===false?'Incomplete':'N/A'}
+                            </span>
+                            {st===false&&<span class="ci-alert" title="Unfavourable result — review required">⚠ Review</span>}
                           </div>
                         );
                       })}
@@ -361,7 +398,9 @@ export class VkycAuditor {
                           {c.questionnaire.map(q=>(
                             <div class="ci-detail-row">
                               <span class="ci-detail-q">{q.q}</span>
-                              <span class={`q-ans q-ans--${q.a}`}>{q.a.toUpperCase()}</span>
+                              <span class={`q-ans q-ans--${q.a==='Confirmed'?'pass':q.a==='Mismatch'?'fail':'na'}`}>
+                                {q.a==='Confirmed'?'✓ Confirmed':q.a==='Mismatch'?'⚠ Mismatch':q.a||'—'}
+                              </span>
                             </div>
                           ))}
                         </div>

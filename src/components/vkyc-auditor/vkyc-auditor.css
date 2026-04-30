@@ -228,3 +228,11 @@
   cursor: pointer; white-space: nowrap; flex-shrink: 0;
 }
 .refresh-btn:hover { background: #e2e8f0; }
+
+/* ── Incomplete check alert ──────────────────────────────── */
+.ci-alert {
+  font-size: 10px; font-weight: 700; padding: 2px 7px;
+  background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa;
+  border-radius: 10px; white-space: nowrap; margin-left: 4px;
+  cursor: help;
+}
