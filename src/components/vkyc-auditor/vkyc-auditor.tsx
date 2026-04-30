@@ -56,23 +56,22 @@ export class VkycAuditor {
             id: r.caseId || 'KYC-DEMO-001',
             extId: 'LIVE-' + Date.now().toString(36).toUpperCase(),
             name: r.applicantName || 'Unknown',
-            status: r.decision === 'approved' ? 'pending' : 'rejected', // pending = awaiting auditor review
+            // Always show in auditor queue — status pending means awaiting audit sign-off
+            status: 'pending',
             callType: 'VCIP', kycType: 'digi-kyc',
             mobile: '—', date, time: time + ' (today)',
             liveness: { passed: true, score: r.livenessScore || 0 },
             panFaceMatch: 85, aadhaarFaceMatch: 82,
-            locationPass: true, consentOk: true, aadhaarFresh: true, ocrOk: true,
+            locationPass: true, consentOk: true, aadhaarFresh: true, ocrOk: r.decision === 'approved',
             officerName: r.officerName || 'Agent Kumar',
             officerId: r.officerId || 'AGT001',
-            duration: '—', remarks: r.remarks || '',
+            duration: '—',
+            // Show agent decision in remarks so auditor knows
+            remarks: (r.decision === 'approved' ? '✅ Agent approved. ' : '⚠ Agent rejected. ') + (r.remarks || ''),
             questionnaire: [{q:'What is your date of birth?',a:'pass'},{q:'According to your Aadhaar, what is your name?',a:'pass'}]
           };
-          // Only add if approved by agent — rejected cases skip auditor
-          if (r.decision === 'approved') {
-            this.cases = [liveCase, ...stubs];
-          } else {
-            this.cases = stubs;
-          }
+          // Always show in auditor queue — both approved and rejected need audit trail
+          this.cases = [liveCase, ...stubs];
           console.log('[Auditor] Session result loaded:', r.applicantName, r.decision);
           return;
         }
