@@ -68,6 +68,22 @@ export class VkycConfig {
     await this.componentWillLoad();
   }
 
+  private async resetDemo() {
+    if (!confirm('Clear all session data? This will remove the last session recording, agent decision and auditor decision. The demo config (applicant details) will be kept.')) return;
+    this.saving = true;
+    try {
+      await Promise.all([
+        fetch(API() + '/session-result', { method: 'DELETE' }),
+        fetch(API() + '/audit-result',   { method: 'DELETE' }),
+        fetch(API() + '/recording',      { method: 'DELETE' }),
+      ]);
+      this.saved = true;
+      setTimeout(() => this.saved = false, 3000);
+      console.log('[Config] Demo session data cleared');
+    } catch(e) { alert('Reset failed — check API connection'); }
+    this.saving = false;
+  }
+
   render() {
     if (this.loading) return <div class="loading">Loading config…</div>;
 
@@ -177,8 +193,22 @@ export class VkycConfig {
               <li>Open <code>?role=agent</code> in a new window (hard refresh)</li>
               <li>Open <code>?role=applicant</code> on the mobile (hard refresh)</li>
               <li>Run the demo — OCR scores will match your PAN card</li>
+              <li>After demo, click <strong>Reset Session</strong> below to clear all session data before the next run</li>
             </ol>
             <div class="info-note">⚠️ Config resets when Railway restarts. Save again before each demo session if needed.</div>
+
+            <div class="reset-demo-section">
+              <div class="reset-demo-title">🔄 Between Demo Runs</div>
+              <div class="reset-demo-sub">Clears session recording, agent decision and auditor decision. Keeps your applicant config.</div>
+              <button class="btn-reset-demo" onClick={() => this.resetDemo()} disabled={this.saving}>
+                {this.saving ? '⏳ Clearing…' : '🗑 Reset Session Data'}
+              </button>
+              {this.saved && (
+                <div class="save-banner" style={{marginTop:'10px'}}>
+                  ✅ Session data cleared — ready for next demo run
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
